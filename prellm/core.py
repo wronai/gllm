@@ -64,6 +64,8 @@ async def preprocess_and_execute(
     prompts_path: str | Path | None = None,
     pipelines_path: str | Path | None = None,
     schemas_path: str | Path | None = None,
+    memory_path: str | Path | None = None,
+    codebase_path: str | Path | None = None,
     **kwargs: Any,
 ) -> PreLLMResponse:
     """One function to preprocess and execute — like litellm.completion() but with small LLM decomposition.
@@ -126,6 +128,8 @@ async def preprocess_and_execute(
         prompts_path=prompts_path,
         pipelines_path=pipelines_path,
         schemas_path=schemas_path,
+        memory_path=memory_path,
+        codebase_path=codebase_path,
         **kwargs,
     )
 
@@ -182,6 +186,8 @@ async def _execute_v3_pipeline(
     prompts_path: str | Path | None = None,
     pipelines_path: str | Path | None = None,
     schemas_path: str | Path | None = None,
+    memory_path: str | Path | None = None,
+    codebase_path: str | Path | None = None,
     **kwargs: Any,
 ) -> PreLLMResponse:
     """Two-agent execution path — PreprocessorAgent + ExecutorAgent + PromptPipeline."""
@@ -215,12 +221,32 @@ async def _execute_v3_pipeline(
     if domain_rules:
         extra_context["domain_rules"] = domain_rules
 
+    # Build optional context enrichment
+    user_memory = None
+    if memory_path:
+        try:
+            from prellm.context.user_memory import UserMemory
+            user_memory = UserMemory(path=memory_path)
+        except Exception as e:
+            logger.warning(f"Failed to initialize UserMemory: {e}")
+
+    codebase_indexer = None
+    if codebase_path:
+        try:
+            from prellm.context.codebase_indexer import CodebaseIndexer
+            codebase_indexer = CodebaseIndexer()
+        except Exception as e:
+            logger.warning(f"Failed to initialize CodebaseIndexer: {e}")
+
     # Build agents
     preprocessor = PreprocessorAgent(
         small_llm=small_provider,
         registry=registry,
         pipeline=prompt_pipeline,
         context_engine=ContextEngine(),
+        user_memory=user_memory,
+        codebase_indexer=codebase_indexer,
+        codebase_path=str(codebase_path) if codebase_path else None,
     )
     executor = ExecutorAgent(
         large_llm=large_provider,

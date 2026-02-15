@@ -55,7 +55,7 @@ class TestParseModelPair:
     def test_no_prefix(self):
         small, large = _parse_model_pair("gpt-4o-mini")
         assert small == SMALL_MODEL
-        assert large == "gpt-4o-mini"
+        assert large == LARGE_MODEL  # no colon → returns server defaults
 
 
 class TestHealthEndpoint:
@@ -79,7 +79,9 @@ class TestHealthEndpoint:
 class TestChatCompletions:
     def test_basic_completion(self):
         client = TestClient(app)
-        with patch("litellm.acompletion", side_effect=_mock_completion_side_effect()):
+        with patch("litellm.acompletion", new=AsyncMock(
+            return_value=_mock_litellm_response("Server response content")
+        )):
             resp = client.post("/v1/chat/completions", json={
                 "model": "prellm:default",
                 "messages": [{"role": "user", "content": "Hello world"}],
@@ -95,7 +97,9 @@ class TestChatCompletions:
 
     def test_with_prellm_extras(self):
         client = TestClient(app)
-        with patch("litellm.acompletion", side_effect=_mock_completion_side_effect()):
+        with patch("litellm.acompletion", new=AsyncMock(
+            return_value=_mock_litellm_response("Server response content")
+        )):
             resp = client.post("/v1/chat/completions", json={
                 "model": "prellm:qwen→claude",
                 "messages": [{"role": "user", "content": "Deploy app"}],
@@ -112,7 +116,9 @@ class TestChatCompletions:
 
     def test_with_yaml_response_format(self):
         client = TestClient(app)
-        with patch("litellm.acompletion", side_effect=_mock_completion_side_effect()):
+        with patch("litellm.acompletion", new=AsyncMock(
+            return_value=_mock_litellm_response("Server response content")
+        )):
             resp = client.post("/v1/chat/completions", json={
                 "model": "prellm:default",
                 "messages": [{"role": "user", "content": "Generate config"}],
@@ -123,7 +129,9 @@ class TestChatCompletions:
 
     def test_prellm_meta_in_response(self):
         client = TestClient(app)
-        with patch("litellm.acompletion", side_effect=_mock_completion_side_effect()):
+        with patch("litellm.acompletion", new=AsyncMock(
+            return_value=_mock_litellm_response("Server response content")
+        )):
             resp = client.post("/v1/chat/completions", json={
                 "model": "prellm:default",
                 "messages": [{"role": "user", "content": "Test query"}],
@@ -170,7 +178,9 @@ class TestChatCompletions:
 
     def test_usage_info(self):
         client = TestClient(app)
-        with patch("litellm.acompletion", side_effect=_mock_completion_side_effect()):
+        with patch("litellm.acompletion", new=AsyncMock(
+            return_value=_mock_litellm_response("Server response content")
+        )):
             resp = client.post("/v1/chat/completions", json={
                 "model": "prellm:default",
                 "messages": [{"role": "user", "content": "Hello world"}],
@@ -213,7 +223,9 @@ class TestChatCompletions:
 
     def test_max_tokens_and_temperature(self):
         client = TestClient(app)
-        with patch("litellm.acompletion", side_effect=_mock_completion_side_effect()):
+        with patch("litellm.acompletion", new=AsyncMock(
+            return_value=_mock_litellm_response("Server response content")
+        )):
             resp = client.post("/v1/chat/completions", json={
                 "model": "prellm:default",
                 "messages": [{"role": "user", "content": "Test"}],
@@ -227,7 +239,9 @@ class TestChatCompletions:
 class TestStreamingEndpoint:
     def test_streaming_response(self):
         client = TestClient(app)
-        with patch("litellm.acompletion", side_effect=_mock_completion_side_effect()):
+        with patch("litellm.acompletion", new=AsyncMock(
+            return_value=_mock_litellm_response("Server response content")
+        )):
             resp = client.post("/v1/chat/completions", json={
                 "model": "prellm:default",
                 "messages": [{"role": "user", "content": "Stream test"}],
@@ -246,7 +260,9 @@ class TestStreamingEndpoint:
 
     def test_streaming_with_stages(self):
         client = TestClient(app)
-        with patch("litellm.acompletion", side_effect=_mock_completion_side_effect()):
+        with patch("litellm.acompletion", new=AsyncMock(
+            return_value=_mock_litellm_response("Server response content")
+        )):
             resp = client.post("/v1/chat/completions", json={
                 "model": "prellm:default",
                 "messages": [{"role": "user", "content": "Stage test"}],
