@@ -4,6 +4,7 @@ Defines workflows as YAML, validates each step through preLLM, supports
 manual/auto approval, rollback, per-step decomposition strategy, and full audit logging.
 
 v0.2: Supports both old `prellm` (v0.1) and new `PreLLM` (v0.2) engines.
+v0.3: Supports two-agent architecture via preprocess_and_execute_v3 when pipeline is specified.
 """
 
 from __future__ import annotations
@@ -193,9 +194,16 @@ class ProcessChain:
             logger.info(f"Step '{step.name}' (dry-run): {analysis}")
             return step_result
 
-        # Execute through engine (v0.2) or guard (v0.1)
+        # Execute through v0.3 pipeline, v0.2 engine, or v0.1 guard
         try:
-            if self._engine:
+            if hasattr(step, 'pipeline') and step.pipeline:
+                from prellm.core import preprocess_and_execute_v3
+                response = await preprocess_and_execute_v3(
+                    query=enriched_prompt,
+                    pipeline=step.pipeline,
+                    user_context=ctx,
+                )
+            elif self._engine:
                 response = await self._engine(enriched_prompt, strategy=step.strategy, extra_context=ctx)
             elif self._guard:
                 response = await self._guard(enriched_prompt, extra_context=ctx)

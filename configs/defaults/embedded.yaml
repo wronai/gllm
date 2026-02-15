@@ -1,0 +1,75 @@
+# preLLM — Embedded/IoT domain defaults
+# Raspberry Pi, ESP32, hardware, firmware, sensors
+
+domain: embedded
+
+small_model:
+  model: "ollama/qwen2.5:3b"
+  max_tokens: 512
+  temperature: 0.0
+
+large_model:
+  model: "anthropic/claude-sonnet-4-20250514"
+  max_tokens: 4096
+  temperature: 0.3
+
+default_pipeline: structure
+
+domain_rules:
+  - name: raspberry_pi
+    keywords: [raspberry, rpi, raspbian, gpio, picamera, hat]
+    intent: configure
+    required_fields: [board_model, os_version]
+    enrich_template: "Specify RPi board model and OS version: {query}"
+    severity: medium
+    strategy: structure
+
+  - name: esp32
+    keywords: [esp32, esp8266, arduino, micropython, platformio, firmware]
+    intent: configure
+    required_fields: [board_type, framework]
+    enrich_template: "Specify ESP board type and framework (Arduino/MicroPython/ESP-IDF): {query}"
+    severity: medium
+    strategy: structure
+
+  - name: sensors
+    keywords: [sensor, i2c, spi, uart, adc, dht, bme, accelerometer, gyroscope]
+    intent: configure
+    required_fields: [sensor_type, interface, board]
+    enrich_template: "Specify sensor model, communication interface, and board: {query}"
+    severity: medium
+    strategy: enrich
+
+  - name: networking
+    keywords: [wifi, bluetooth, ble, mqtt, lorawan, zigbee, thread, matter]
+    intent: configure
+    required_fields: [protocol, board]
+    enrich_template: "Specify communication protocol and target board: {query}"
+    severity: medium
+    strategy: structure
+
+  - name: power
+    keywords: [battery, power, sleep, deep sleep, low power, consumption]
+    intent: query
+    required_fields: [board, power_source]
+    enrich_template: "Specify board and power source/constraints: {query}"
+    severity: medium
+    strategy: classify
+
+prompts:
+  classify:
+    system: |
+      You are an embedded systems query classifier. Analyze the query and determine intent.
+      Possible intents: configure, query, create, monitor, other.
+      Respond ONLY with JSON: {"intent": "...", "confidence": 0.0-1.0, "domain": "embedded"}
+    max_tokens: 256
+    temperature: 0.1
+
+  compose:
+    system: |
+      You are an embedded systems prompt composer. Given classification and context,
+      compose an optimal prompt for a large LLM to solve the embedded/IoT task.
+      Include: board specs, pin assignments, voltage levels, memory constraints.
+      Return only the composed prompt text.
+    max_tokens: 1024
+    temperature: 0.2

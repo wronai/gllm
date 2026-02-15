@@ -11,10 +11,18 @@ Usage:
     print(result.content)
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
-# 1-function API — the primary interface
+# 1-function API — the primary interface (unified v0.2 + v0.3)
 from prellm.core import preprocess_and_execute, preprocess_and_execute_sync
+
+# v0.3 backward-compatible alias (preprocess_and_execute now handles both paths)
+from prellm.core import preprocess_and_execute_v3
+from prellm.agents.preprocessor import PreprocessorAgent, PreprocessResult
+from prellm.agents.executor import ExecutorAgent, ExecutorResult
+from prellm.pipeline import PromptPipeline, PipelineConfig, PipelineStep, PipelineResult
+from prellm.prompt_registry import PromptRegistry
+from prellm.validators import ResponseValidator
 
 # v0.2 — class-based architecture
 from prellm.core import PreLLM
@@ -36,10 +44,26 @@ from prellm.chains.process_chain import ProcessChain
 from prellm.analyzers.bias_detector import BiasDetector
 from prellm.analyzers.context_engine import ContextEngine
 
+# User memory
+from prellm.context.user_memory import UserMemory
+
 __all__ = [
-    # 1-function API (primary)
+    # 1-function API (primary, unified v0.2 + v0.3)
     "preprocess_and_execute",
     "preprocess_and_execute_sync",
+    # v0.3 backward-compatible alias
+    "preprocess_and_execute_v3",
+    "PreprocessorAgent",
+    "PreprocessResult",
+    "ExecutorAgent",
+    "ExecutorResult",
+    "PromptPipeline",
+    "PipelineConfig",
+    "PipelineStep",
+    "PipelineResult",
+    "PromptRegistry",
+    "ResponseValidator",
+    "UserMemory",
     # v0.2 class-based
     "PreLLM",
     "LLMProvider",

@@ -1,0 +1,67 @@
+# preLLM — Business domain defaults
+# Leasing, invoicing, reports, analytics, compliance
+
+domain: business
+
+small_model:
+  model: "ollama/qwen2.5:3b"
+  max_tokens: 512
+  temperature: 0.0
+
+large_model:
+  model: "anthropic/claude-sonnet-4-20250514"
+  max_tokens: 4096
+  temperature: 0.5
+
+default_pipeline: enrich
+
+domain_rules:
+  - name: leasing
+    keywords: [leasing, lease, contract, tenant, rental, umowa]
+    intent: query
+    required_fields: [contract_type, duration, parties]
+    enrich_template: "Specify contract type, duration, and parties involved: {query}"
+    severity: medium
+    strategy: enrich
+
+  - name: invoicing
+    keywords: [invoice, faktura, billing, payment, vat, tax]
+    intent: create
+    required_fields: [recipient, amount, currency]
+    enrich_template: "Specify recipient, amount, and currency for invoice: {query}"
+    severity: high
+    strategy: structure
+
+  - name: reporting
+    keywords: [report, raport, analytics, dashboard, summary, kpi, metric]
+    intent: query
+    required_fields: [time_range, data_source]
+    enrich_template: "Specify time range and data source for report: {query}"
+    severity: medium
+    strategy: classify
+
+  - name: compliance
+    keywords: [compliance, gdpr, rodo, audit, regulation, policy]
+    intent: query
+    required_fields: [regulation_type, scope]
+    enrich_template: "Specify regulation and compliance scope: {query}"
+    severity: high
+    strategy: enrich
+
+prompts:
+  classify:
+    system: |
+      You are a business query classifier. Analyze the query and determine intent.
+      Possible intents: query, create, delete, configure, other.
+      Respond ONLY with JSON: {"intent": "...", "confidence": 0.0-1.0, "domain": "business"}
+    max_tokens: 256
+    temperature: 0.1
+
+  compose:
+    system: |
+      You are a business prompt composer. Given classification and context,
+      compose an optimal prompt for a large LLM to handle the business task.
+      Include: relevant regulations, formats, currency, language preferences.
+      Return only the composed prompt text.
+    max_tokens: 1024
+    temperature: 0.2

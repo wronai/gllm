@@ -1,6 +1,12 @@
 """Core preLLM — main entry points for prompt decomposition, enrichment, and LLM calls.
 
-v0.2 architecture:
+v0.3 architecture (two-agent):
+    User Query
+      → PreprocessorAgent (small LLM ≤24B, PromptPipeline)
+      → ExecutorAgent (large LLM >24B)
+      → PreLLMResponse
+
+v0.2 architecture (backward compat):
     User Query
       → ContextEngine (env/git/system)
       → Small LLM ≤3B (classify → structure → compose)
@@ -37,6 +43,11 @@ from prellm.models import (
     PreLLMResponse,
 )
 from prellm.query_decomposer import QueryDecomposer
+from prellm.agents.executor import ExecutorAgent
+from prellm.agents.preprocessor import PreprocessorAgent
+from prellm.pipeline import PromptPipeline
+from prellm.prompt_registry import PromptRegistry
+from prellm.validators import ResponseValidator
 
 logger = logging.getLogger("prellm")
 
@@ -53,9 +64,17 @@ async def preprocess_and_execute(
     user_context: str | dict[str, str] | None = None,
     config_path: str | Path | None = None,
     domain_rules: list[dict[str, Any]] | None = None,
+    pipeline: str | None = None,
+    prompts_path: str | Path | None = None,
+    pipelines_path: str | Path | None = None,
+    schemas_path: str | Path | None = None,
     **kwargs: Any,
 ) -> PreLLMResponse:
     """One function to preprocess and execute — like litellm.completion() but with small LLM decomposition.
+
+    Supports two execution paths:
+      - v0.2 (default): strategy-based via PreLLM class (classify, structure, split, enrich, passthrough)
+      - v0.3 (pipeline=...): two-agent via PreprocessorAgent + ExecutorAgent + PromptPipeline
 
     Args:
         query: The raw user query / prompt.
@@ -65,24 +84,40 @@ async def preprocess_and_execute(
         user_context: Extra context as a string tag (e.g. "gdansk_embedded_python") or dict.
         config_path: Optional YAML config file for domain rules, prompts, etc.
         domain_rules: Optional inline domain rules as list of dicts.
+        pipeline: Pipeline name from pipelines.yaml (e.g. "dual_agent_full"). When set, uses v0.3 two-agent path.
+        prompts_path: Path to prompts.yaml (v0.3 only).
+        pipelines_path: Path to pipelines.yaml (v0.3 only).
+        schemas_path: Path to response_schemas.yaml (v0.3 only).
         **kwargs: Extra kwargs passed to the large LLM call (max_tokens, temperature, etc.).
 
     Returns:
         PreLLMResponse with content, decomposition details, model info.
 
     Usage:
-        from prellm import preprocess_and_execute
+        # v0.2 — strategy-based (default)
+        result = await preprocess_and_execute("Deploy app", strategy="structure")
 
-        result = await preprocess_and_execute(
-            query="Deploy app to production",
-            small_llm="ollama/qwen2.5:3b",
-            large_llm="gpt-4o-mini",
-        )
-        print(result.content)
+        # v0.3 — two-agent pipeline
+        result = await preprocess_and_execute("Deploy app", pipeline="dual_agent_full")
 
     Zero-config:
         result = await preprocess_and_execute("Refaktoryzuj kod")
     """
+    # v0.3 two-agent path — when pipeline is explicitly specified
+    if pipeline is not None:
+        return await _execute_v3_pipeline(
+            query=query,
+            small_llm=small_llm,
+            large_llm=large_llm,
+            pipeline=pipeline,
+            user_context=user_context,
+            prompts_path=prompts_path,
+            pipelines_path=pipelines_path,
+            schemas_path=schemas_path,
+            **kwargs,
+        )
+
+    # v0.2 strategy-based path (default)
     # Resolve strategy
     if isinstance(strategy, str):
         strat = DecompositionStrategy(strategy)
@@ -135,6 +170,10 @@ def preprocess_and_execute_sync(
     user_context: str | dict[str, str] | None = None,
     config_path: str | Path | None = None,
     domain_rules: list[dict[str, Any]] | None = None,
+    pipeline: str | None = None,
+    prompts_path: str | Path | None = None,
+    pipelines_path: str | Path | None = None,
+    schemas_path: str | Path | None = None,
     **kwargs: Any,
 ) -> PreLLMResponse:
     """Synchronous version of preprocess_and_execute() — runs the async function in an event loop.
@@ -152,16 +191,112 @@ def preprocess_and_execute_sync(
         user_context=user_context,
         config_path=config_path,
         domain_rules=domain_rules,
+        pipeline=pipeline,
+        prompts_path=prompts_path,
+        pipelines_path=pipelines_path,
+        schemas_path=schemas_path,
         **kwargs,
     ))
 
 
 # ============================================================
-# v0.2 — PreLLM (new architecture)
+# v0.3 — Two-agent execution (internal, called by preprocess_and_execute)
+# ============================================================
+
+async def _execute_v3_pipeline(
+    query: str,
+    small_llm: str,
+    large_llm: str,
+    pipeline: str,
+    user_context: str | dict[str, str] | None = None,
+    prompts_path: str | Path | None = None,
+    pipelines_path: str | Path | None = None,
+    schemas_path: str | Path | None = None,
+    **kwargs: Any,
+) -> PreLLMResponse:
+    """Two-agent execution path — PreprocessorAgent + ExecutorAgent + PromptPipeline."""
+    max_tokens = kwargs.pop("max_tokens", 2048)
+    temperature = kwargs.pop("temperature", 0.7)
+
+    # Build LLM providers
+    small_llm_config = LLMProviderConfig(model=small_llm, max_tokens=512, temperature=0.0)
+    large_llm_config = LLMProviderConfig(model=large_llm, max_tokens=max_tokens, temperature=temperature)
+
+    small_provider = LLMProvider(small_llm_config)
+    large_provider = LLMProvider(large_llm_config)
+
+    # Build registry and pipeline
+    registry = PromptRegistry(prompts_path=prompts_path)
+    prompt_pipeline = PromptPipeline.from_yaml(
+        pipelines_path=pipelines_path,
+        pipeline_name=pipeline,
+        registry=registry,
+        small_llm=small_provider,
+    )
+
+    # Build context
+    extra_context: dict[str, str] | None = None
+    if isinstance(user_context, str) and user_context:
+        extra_context = {"user_context": user_context}
+    elif isinstance(user_context, dict):
+        extra_context = user_context
+
+    # Build agents
+    preprocessor = PreprocessorAgent(
+        small_llm=small_provider,
+        registry=registry,
+        pipeline=prompt_pipeline,
+        context_engine=ContextEngine(),
+    )
+    executor = ExecutorAgent(
+        large_llm=large_provider,
+        response_validator=ResponseValidator(schemas_path=schemas_path) if schemas_path else None,
+    )
+
+    # 1. Preprocess
+    prep_result = await preprocessor.preprocess(
+        query=query,
+        user_context=extra_context,
+        pipeline_name=pipeline,
+    )
+
+    # 2. Execute
+    exec_result = await executor.execute(
+        executor_input=prep_result.executor_input,
+        **kwargs,
+    )
+
+    # 3. Build response (backward-compatible PreLLMResponse)
+    decomposition_result = None
+    if prep_result.decomposition:
+        from prellm.models import DecompositionResult
+        decomposition_result = DecompositionResult(
+            strategy=DecompositionStrategy(pipeline) if pipeline in [s.value for s in DecompositionStrategy] else DecompositionStrategy.CLASSIFY,
+            original_query=query,
+            composed_prompt=prep_result.executor_input,
+        )
+
+    return PreLLMResponse(
+        content=exec_result.content,
+        decomposition=decomposition_result,
+        model_used=exec_result.model_used,
+        small_model_used=small_llm,
+        retries=exec_result.retries,
+        clarified=False,
+        needs_more_context=False,
+    )
+
+
+# Backward-compatible alias
+preprocess_and_execute_v3 = preprocess_and_execute
+
+
+# ============================================================
+# v0.2 — PreLLM (class-based architecture, backward compat)
 # ============================================================
 
 class PreLLM:
-    """preLLM v0.2 — small LLM decomposition before large LLM routing.
+    """preLLM v0.2/v0.3 — small LLM decomposition before large LLM routing.
 
     Usage:
         engine = PreLLM("prellm_config.yaml")
@@ -170,6 +305,10 @@ class PreLLM:
     Or with inline config:
         engine = PreLLM(config=PreLLMConfig(...))
         result = await engine("Deploy the app", strategy=DecompositionStrategy.STRUCTURE)
+
+    v0.3 two-agent mode:
+        engine = PreLLM(config=config, use_agents=True)
+        result = await engine("Deploy the app", pipeline="dual_agent_full")
     """
 
     def __init__(

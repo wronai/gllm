@@ -1,3 +1,34 @@
+## [0.3.3] - 2026-02-15
+
+### Summary
+
+fix(tests): configuration management system
+
+### Test
+
+- update tests/test_executor_agent.py
+- update tests/test_one_function.py
+- update tests/test_preprocessor_agent.py
+- update tests/test_server.py
+- update tests/test_user_memory.py
+- update tests/test_v3_architecture.py
+- update tests/test_validators.py
+
+### Other
+
+- config: update business.yaml
+- config: update coding.yaml
+- config: update devops.yaml
+- config: update embedded.yaml
+- update prellm/__init__.py
+- update prellm/agents/__init__.py
+- update prellm/agents/executor.py
+- update prellm/agents/preprocessor.py
+- update prellm/chains/process_chain.py
+- update prellm/context/__init__.py
+- ... and 6 more
+
+
 ## [0.3.2] - 2026-02-15
 
 ### Summary

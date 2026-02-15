@@ -1,0 +1,75 @@
+# preLLM — Coding domain defaults
+# Refactoring, code review, debugging, architecture
+
+domain: coding
+
+small_model:
+  model: "ollama/qwen2.5:3b"
+  max_tokens: 512
+  temperature: 0.0
+
+large_model:
+  model: "anthropic/claude-sonnet-4-20250514"
+  max_tokens: 8192
+  temperature: 0.4
+
+default_pipeline: structure
+
+domain_rules:
+  - name: refactor
+    keywords: [refactor, refaktoryzuj, clean up, simplify, extract, rename]
+    intent: create
+    required_fields: [target_file, scope]
+    enrich_template: "Specify which file/function to refactor and scope: {query}"
+    severity: medium
+    strategy: structure
+
+  - name: review
+    keywords: [review, code review, check, audit, analyze code]
+    intent: query
+    required_fields: [target_file]
+    enrich_template: "Specify which code to review: {query}"
+    severity: medium
+    strategy: classify
+
+  - name: debug
+    keywords: [debug, bug, fix, error, exception, traceback, crash]
+    intent: query
+    required_fields: [error_message, target_file]
+    enrich_template: "Provide error message and affected file: {query}"
+    severity: high
+    strategy: enrich
+
+  - name: architecture
+    keywords: [architecture, design, pattern, structure, module, component]
+    intent: create
+    required_fields: [scope, constraints]
+    enrich_template: "Specify architectural scope and constraints: {query}"
+    severity: medium
+    strategy: split
+
+  - name: testing
+    keywords: [test, unittest, pytest, coverage, mock, fixture]
+    intent: create
+    required_fields: [target_file, test_type]
+    enrich_template: "Specify what to test and test type (unit/integration/e2e): {query}"
+    severity: medium
+    strategy: structure
+
+prompts:
+  classify:
+    system: |
+      You are a coding task classifier. Analyze the query and determine intent.
+      Possible intents: create, query, delete, configure, other.
+      Respond ONLY with JSON: {"intent": "...", "confidence": 0.0-1.0, "domain": "coding"}
+    max_tokens: 256
+    temperature: 0.1
+
+  compose:
+    system: |
+      You are a coding prompt composer. Given classification and context,
+      compose an optimal prompt for a large LLM to complete the coding task.
+      Include: file paths, language, frameworks, coding style preferences.
+      Return only the composed prompt text.
+    max_tokens: 1024
+    temperature: 0.2

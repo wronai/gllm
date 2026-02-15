@@ -1,6 +1,6 @@
 project: prellm
-generated: "2026-02-15T20:15:22.739735"
-modules[30]{path,lang,items}:
+generated: "2026-02-15T20:27:32.349247"
+modules[41]{path,lang,items}:
   examples/python_sdk.py,python,8
   prellm/env_config.py,python,4
   prellm/cli.py,python,9
@@ -8,10 +8,13 @@ modules[30]{path,lang,items}:
   prellm/__init__.py,python,0
   prellm/query_decomposer.py,python,9
   prellm/prompt_registry.py,python,11
+  prellm/validators.py,python,8
   prellm/models.py,python,0
-  prellm/core.py,python,14
+  prellm/core.py,python,15
   prellm/llm_provider.py,python,4
   prellm/pipeline.py,python,12
+  tests/test_executor_agent.py,python,9
+  tests/test_preprocessor_agent.py,python,10
   tests/test_one_function.py,python,20
   tests/test_edge_cases.py,python,17
   tests/test_promptguard.py,python,25
@@ -19,18 +22,26 @@ modules[30]{path,lang,items}:
   tests/test_decomposer.py,python,14
   tests/test_env_config.py,python,21
   tests/__init__.py,python,0
+  tests/test_validators.py,python,15
   tests/test_context.py,python,7
+  tests/test_user_memory.py,python,8
   tests/test_v2_architecture.py,python,43
   tests/test_models.py,python,21
+  tests/test_v3_architecture.py,python,15
   tests/test_integration.py,python,22
   tests/test_prompt_registry.py,python,14
   tests/test_pipeline.py,python,16
   htmlcov/coverage_html_cb_dd2e7eb5.js,javascript,6
   prellm/chains/__init__.py,python,0
   prellm/chains/process_chain.py,python,6
+  prellm/context/user_memory.py,python,8
+  prellm/context/__init__.py,python,0
   prellm/analyzers/bias_detector.py,python,2
   prellm/analyzers/__init__.py,python,0
   prellm/analyzers/context_engine.py,python,6
+  prellm/agents/preprocessor.py,python,4
+  prellm/agents/__init__.py,python,0
+  prellm/agents/executor.py,python,3
 
 function_details:
   examples/python_sdk.py:
@@ -62,15 +73,15 @@ function_details:
       _run_guard,function,"(guard, query:str, model:str)",419-420,true,2,1,starts guard
   prellm/server.py:
     functions[9]{name,kind,sig,loc,async,lines,cc,does}:
-      _parse_model_pair,function,"(model_str:str) -> tuple[str, str]",177-208,false,32,10,"Parse 'prellm:qwen→claude' or 'prellm:small→large' into (small, large) model str..."
-      _build_prellm_meta,function,"(result:PreLLMResponse, strategy:str) -> PreLLMMeta",211-226,false,16,3,Build preLLM metadata from a PreLLMResponse.
-      health,function,() -> HealthResponse,234-240,true,7,1,health
-      list_models,function,(),244-252,true,9,1,List available model pairs.
-      chat_completions,function,"(req:ChatCompletionRequest)",256-323,true,68,11,OpenAI-compatible chat completions with preLLM preprocessing.
-      _stream_response,function,"(query:str, small:str, large:str, strategy:str, extras:PreLLMExtras) -> AsyncGenerator[str, None]",326-379,true,54,4,SSE streaming response with stage progress.
-      batch_process,function,"(items:list[BatchItem])",383-406,true,24,3,Process multiple queries in parallel.
-      create_app,function,"(small_model:Any=None, large_model:Any=None, strategy:Any=None, config_path:Any=None, master_key:Any=None, dotenv_path:Any=None) -> FastAPI",409-441,false,33,7,Factory function to create a configured preLLM API server.
-      AuthMiddleware.dispatch,method,"(request:Request, call_next)",136-155,true,20,5,sends
+      _parse_model_pair,function,"(model_str:str) -> tuple[str, str]",179-210,false,32,10,"Parse 'prellm:qwen→claude' or 'prellm:small→large' into (small, large) model str..."
+      _build_prellm_meta,function,"(result:PreLLMResponse, strategy:str) -> PreLLMMeta",213-228,false,16,3,Build preLLM metadata from a PreLLMResponse.
+      health,function,() -> HealthResponse,236-242,true,7,1,health
+      list_models,function,(),246-254,true,9,1,List available model pairs.
+      chat_completions,function,"(req:ChatCompletionRequest)",258-337,true,80,13,OpenAI-compatible chat completions with preLLM preprocessing.
+      _stream_response,function,"(query:str, small:str, large:str, strategy:str, extras:PreLLMExtras) -> AsyncGenerator[str, None]",340-393,true,54,4,SSE streaming response with stage progress.
+      batch_process,function,"(items:list[BatchItem])",397-420,true,24,3,Process multiple queries in parallel.
+      create_app,function,"(small_model:Any=None, large_model:Any=None, strategy:Any=None, config_path:Any=None, master_key:Any=None, dotenv_path:Any=None) -> FastAPI",423-455,false,33,7,Factory function to create a configured preLLM API server.
+      AuthMiddleware.dispatch,method,"(request:Request, call_next)",138-157,true,20,5,sends
   prellm/query_decomposer.py:
     functions[9]{name,kind,sig,loc,async,lines,cc,does}:
       QueryDecomposer.__init__,method,"(small_llm:LLMProvider, prompts:Any=None, domain_rules:Any=None)",45-53,false,9,3,creates
@@ -95,22 +106,33 @@ function_details:
       PromptRegistry.validate,method,"() -> list[str]",133-154,false,22,5,Validate that all prompts have non-empty templates.
       PromptRegistry.register,method,"(name:str, system_template:str, max_tokens:int=512, temperature:float=0.1) -> None",156-164,false,9,1,Register a prompt programmatically (useful for testing or dynamic prompts).
       PromptRegistry._render,method,"(template_str:str, variables:dict[str,Any]) -> str",166-174,false,9,3,Render a Jinja2 template string with variables.
+  prellm/validators.py:
+    functions[8]{name,kind,sig,loc,async,lines,cc,does}:
+      ResponseValidator.__init__,method,"(schemas_path:Any=None)",46-49,false,4,2,creates
+      ResponseValidator._ensure_loaded,method,() -> None,51-53,false,3,2,ensure loaded
+      ResponseValidator._load,method,() -> None,55-75,false,21,5,Load schemas from YAML file.
+      ResponseValidator.list_schemas,method,"() -> list[str]",77-80,false,4,1,List available schema names.
+      ResponseValidator.validate,method,"(data:dict[str,Any], schema_name:str) -> ValidationResult",82-128,false,47,9,Validate a dict against a named schema.
+      ResponseValidator.validate_or_retry,method,"(data:dict[str,Any], schema_name:str, retry_fn:Callable[Any,dict[str,Any]], max_retries:int=2) -> tuple[dict[str, Any], int]",130-157,false,28,3,"Validate, and if invalid, call retry_fn and try again."
+      ResponseValidator._check_type,method,"(value:Any, expected_type:str, field:str) -> str | None",160-184,false,25,5,Check if a value matches the expected type string.
+      ResponseValidator._check_constraints,method,"(value:Any, constraint:dict[str,Any], field:str) -> list[str]",187-213,false,27,14,Check constraints on a value.
   prellm/core.py:
-    functions[14]{name,kind,sig,loc,async,lines,cc,does}:
-      preprocess_and_execute,function,"(query:str, small_llm:str='ollama/qwen2.5:3b', large_llm:str='anthropic/claude-sonnet-4-20250514', strategy:Any='classify', user_context:Any=None, config_path:Any=None, domain_rules:Any=None) -> PreLLMResponse",48-126,true,79,11,One function to preprocess and execute — like litellm.completion() but with smal...
-      preprocess_and_execute_sync,function,"(query:str, small_llm:str='ollama/qwen2.5:3b', large_llm:str='anthropic/claude-sonnet-4-20250514', strategy:Any='classify', user_context:Any=None, config_path:Any=None, domain_rules:Any=None) -> PreLLMResponse",130-156,false,27,1,Synchronous version of preprocess_and_execute() — runs the async function in an...
-      PreLLM.__init__,method,"(config_path:Any=None, config:Any=None)",175-195,false,21,3,creates
-      PreLLM.__call__,method,"(query:str, strategy:Any=None, extra_context:Any=None) -> PreLLMResponse",197-257,true,61,6,"Full pipeline: context → decompose (small LLM) → large LLM → response."
-      PreLLM.decompose_only,method,"(query:str, strategy:Any=None, extra_context:Any=None) -> dict[str, Any]",259-287,true,29,5,Run decomposition without calling the large LLM — useful for dry-run / testing.
-      PreLLM.get_audit_log,method,"() -> list[dict[str, Any]]",289-291,false,3,2,Return audit log as list of dicts.
-      PreLLM._audit,method,"(action:str, query:str, response:PreLLMResponse) -> None",293-305,false,13,3,audit
-      PreLLM._load_config,method,"(path:Path) -> PreLLMConfig",308-348,false,41,10,Load preLLM v0.2 config from YAML file.
-      prellm.__init__,method,"(config_path:Any=None, config:Any=None)",365-379,false,15,4,creates
-      prellm.__call__,method,"(query:str, model:Any=None, extra_context:Any=None) -> GuardResponse",381-447,true,67,11,"Analyze query, enrich if needed, call LLM, validate response."
-      prellm.analyze_only,method,"(query:str) -> dict[str, Any]",449-460,false,12,2,Run analysis without calling LLM — useful for dry-run / testing.
-      prellm.get_audit_log,method,"() -> list[dict[str, Any]]",462-464,false,3,2,Return audit log as list of dicts.
-      prellm._audit,method,"(action:str, query:str, response:GuardResponse, model:str) -> None",466-474,false,9,2,audit
-      prellm._load_config,method,"(path:Path) -> GuardConfig",477-498,false,22,5,Load config from YAML file.
+    functions[15]{name,kind,sig,loc,async,lines,cc,does}:
+      preprocess_and_execute,function,"(query:str, small_llm:str='ollama/qwen2.5:3b', large_llm:str='anthropic/claude-sonnet-4-20250514', strategy:Any='classify', user_context:Any=None, config_path:Any=None, domain_rules:Any=None) -> PreLLMResponse",59-137,true,79,11,One function to preprocess and execute — like litellm.completion() but with smal...
+      preprocess_and_execute_sync,function,"(query:str, small_llm:str='ollama/qwen2.5:3b', large_llm:str='anthropic/claude-sonnet-4-20250514', strategy:Any='classify', user_context:Any=None, config_path:Any=None, domain_rules:Any=None) -> PreLLMResponse",141-167,false,27,1,Synchronous version of preprocess_and_execute() — runs the async function in an...
+      preprocess_and_execute_v3,function,"(query:str, small_llm:str='ollama/qwen2.5:3b', large_llm:str='anthropic/claude-sonnet-4-20250514', pipeline:str='classify', user_context:Any=None, config_path:Any=None, prompts_path:Any=None, pipelines_path:Any=None) -> PreLLMResponse",174-274,true,101,8,Two-agent preprocess and execute — v0.3 architecture.
+      PreLLM.__init__,method,"(config_path:Any=None, config:Any=None)",297-317,false,21,3,creates
+      PreLLM.__call__,method,"(query:str, strategy:Any=None, extra_context:Any=None) -> PreLLMResponse",319-379,true,61,6,"Full pipeline: context → decompose (small LLM) → large LLM → response."
+      PreLLM.decompose_only,method,"(query:str, strategy:Any=None, extra_context:Any=None) -> dict[str, Any]",381-409,true,29,5,Run decomposition without calling the large LLM — useful for dry-run / testing.
+      PreLLM.get_audit_log,method,"() -> list[dict[str, Any]]",411-413,false,3,2,Return audit log as list of dicts.
+      PreLLM._audit,method,"(action:str, query:str, response:PreLLMResponse) -> None",415-427,false,13,3,audit
+      PreLLM._load_config,method,"(path:Path) -> PreLLMConfig",430-470,false,41,10,Load preLLM v0.2 config from YAML file.
+      prellm.__init__,method,"(config_path:Any=None, config:Any=None)",487-501,false,15,4,creates
+      prellm.__call__,method,"(query:str, model:Any=None, extra_context:Any=None) -> GuardResponse",503-569,true,67,11,"Analyze query, enrich if needed, call LLM, validate response."
+      prellm.analyze_only,method,"(query:str) -> dict[str, Any]",571-582,false,12,2,Run analysis without calling LLM — useful for dry-run / testing.
+      prellm.get_audit_log,method,"() -> list[dict[str, Any]]",584-586,false,3,2,Return audit log as list of dicts.
+      prellm._audit,method,"(action:str, query:str, response:GuardResponse, model:str) -> None",588-596,false,9,2,audit
+      prellm._load_config,method,"(path:Path) -> GuardConfig",599-620,false,22,5,Load config from YAML file.
   prellm/llm_provider.py:
     functions[4]{name,kind,sig,loc,async,lines,cc,does}:
       LLMProvider.__init__,method,"(config:LLMProviderConfig)",26-27,false,2,1,creates
@@ -131,6 +153,29 @@ function_details:
       PromptPipeline._algo_domain_rule_matcher,method,"(inputs:dict[str,Any], state:dict[str,Any], config:dict[str,Any]) -> dict[str, Any]",321-343,false,23,9,Match classification against domain rules in context.
       PromptPipeline._algo_field_validator,method,"(inputs:dict[str,Any], state:dict[str,Any], config:dict[str,Any]) -> list[str]",346-359,false,14,5,Validate extracted fields against required fields from matched rule.
       PromptPipeline._algo_yaml_formatter,method,"(inputs:dict[str,Any], state:dict[str,Any], config:dict[str,Any]) -> dict[str, Any]",362-377,false,16,4,Format pipeline state into structured executor input.
+  tests/test_executor_agent.py:
+    functions[9]{name,kind,sig,loc,async,lines,cc,does}:
+      mock_large_llm,function,() -> LLMProvider,18-22,false,5,1,mock large llm
+      sample_schemas_yaml,function,"(tmp_path:Path) -> Path",26-38,false,13,1,sample schemas yaml
+      validator,function,"(sample_schemas_yaml:Path) -> ResponseValidator",42-43,false,2,1,validator
+      agent,function,"(mock_large_llm:LLMProvider) -> ExecutorAgent",47-48,false,2,1,agent
+      test_executor_agent_calls_large_llm,function,"(agent:ExecutorAgent, mock_large_llm:LLMProvider)",52-58,true,7,1,ExecutorAgent calls the large LLM with the structured prompt.
+      test_executor_agent_retry_fallback,function,"(mock_large_llm:LLMProvider)",62-69,true,8,1,ExecutorAgent handles LLM failures gracefully.
+      test_executor_agent_schema_validation,function,"(mock_large_llm:LLMProvider, validator:ResponseValidator)",73-85,true,13,1,ExecutorAgent validates response against schema when configured.
+      test_executor_agent_no_validation_by_default,function,"(agent:ExecutorAgent)",89-93,true,5,1,ExecutorAgent skips validation when no validator configured.
+      test_executor_agent_system_prompt,function,"(agent:ExecutorAgent, mock_large_llm:LLMProvider)",97-101,true,5,1,ExecutorAgent passes system_prompt to the LLM call.
+  tests/test_preprocessor_agent.py:
+    functions[10]{name,kind,sig,loc,async,lines,cc,does}:
+      sample_prompts_yaml,function,"(tmp_path:Path) -> Path",19-29,false,11,1,sample prompts yaml
+      registry,function,"(sample_prompts_yaml:Path) -> PromptRegistry",33-34,false,2,1,registry
+      mock_llm,function,() -> LLMProvider,38-44,false,7,1,mock llm
+      pipeline,function,"(registry:PromptRegistry, mock_llm:LLMProvider) -> PromptPipeline",48-56,false,9,1,pipeline
+      agent,function,"(mock_llm:LLMProvider, registry:PromptRegistry, pipeline:PromptPipeline) -> PreprocessorAgent",60-66,false,7,1,agent
+      test_preprocessor_agent_returns_structured_input,function,"(agent:PreprocessorAgent)",70-76,true,7,1,PreprocessorAgent returns a PreprocessResult with executor_input.
+      test_preprocessor_agent_context_gathering,function,"(mock_llm:LLMProvider, registry:PromptRegistry, pipeline:PromptPipeline)",80-95,true,16,1,PreprocessorAgent gathers and merges context.
+      test_preprocessor_agent_pipeline_execution,function,"(agent:PreprocessorAgent)",99-104,true,6,1,PreprocessorAgent executes the pipeline and stores decomposition.
+      test_preprocessor_agent_confidence_extraction,function,"(agent:PreprocessorAgent)",108-111,true,4,1,PreprocessorAgent extracts confidence from classification step.
+      test_preprocessor_agent_pipeline_name_override,function,"(agent:PreprocessorAgent)",115-118,true,4,1,PreprocessorAgent allows pipeline_name override.
   tests/test_one_function.py:
     functions[20]{name,kind,sig,loc,async,lines,cc,does}:
       _mock_litellm_response,function,"(content:str) -> MagicMock",16-20,false,5,1,mock litellm response
@@ -264,6 +309,23 @@ function_details:
       TestAuthMiddleware.test_auth_with_x_api_key,method,(),269-288,false,20,1,checks auth with x api key
       TestAuthMiddleware.test_wrong_key_rejected,method,(),290-302,false,13,1,checks wrong key rejected
       TestAuthMiddleware.teardown_method,method,(),304-307,false,4,1,Reset master key after each test.
+  tests/test_validators.py:
+    functions[15]{name,kind,sig,loc,async,lines,cc,does}:
+      sample_schemas_yaml,function,"(tmp_path:Path) -> Path",14-45,false,32,1,sample schemas yaml
+      validator,function,"(sample_schemas_yaml:Path) -> ResponseValidator",49-50,false,2,1,validator
+      test_validator_loads_schemas,function,"(validator:ResponseValidator)",53-57,false,5,1,Validator loads schemas from YAML.
+      test_validator_passes_valid_classification,function,"(validator:ResponseValidator)",60-67,false,8,1,Valid classification data passes validation.
+      test_validator_rejects_invalid_confidence,function,"(validator:ResponseValidator)",70-77,false,8,2,"Confidence outside [0.0, 1.0] range fails validation."
+      test_validator_rejects_negative_confidence,function,"(validator:ResponseValidator)",80-87,false,8,2,Negative confidence fails validation.
+      test_validator_rejects_missing_required,function,"(validator:ResponseValidator)",90-95,false,6,3,Missing required fields fail validation.
+      test_validator_enum_constraint,function,"(validator:ResponseValidator)",98-105,false,8,2,Invalid enum value fails validation.
+      test_validator_list_length_constraint,function,"(validator:ResponseValidator)",108-115,false,8,2,List exceeding max_length fails validation.
+      test_validator_list_min_length_constraint,function,"(validator:ResponseValidator)",118-125,false,8,2,Empty list below min_length fails validation.
+      test_validator_valid_split,function,"(validator:ResponseValidator)",128-134,false,7,1,Valid split result passes validation.
+      test_validate_or_retry_succeeds_on_second,function,"(validator:ResponseValidator)",137-151,false,15,1,validate_or_retry retries and succeeds when retry_fn returns valid data.
+      test_validate_or_retry_exhausts_retries,function,"(validator:ResponseValidator)",154-163,false,10,1,validate_or_retry stops after max_retries even if still invalid.
+      test_validator_unknown_schema,function,"(validator:ResponseValidator)",166-170,false,5,2,Validating against non-existent schema returns invalid.
+      test_validator_nonexistent_file,function,(),173-176,false,4,1,Validator handles missing YAML file gracefully.
   tests/test_context.py:
     functions[7]{name,kind,sig,loc,async,lines,cc,does}:
       TestContextEngine.test_env_context,method,(monkeypatch),10-16,false,7,1,checks env context
@@ -273,6 +335,16 @@ function_details:
       TestContextEngine.test_system_context,method,(),35-40,false,6,1,checks system context
       TestContextEngine.test_empty_sources,method,(),42-44,false,3,1,checks empty sources
       TestContextEngine.test_multiple_sources,method,(monkeypatch),46-54,false,9,1,checks multiple sources
+  tests/test_user_memory.py:
+    functions[8]{name,kind,sig,loc,async,lines,cc,does}:
+      memory,function,"(tmp_path:Path) -> UserMemory",13-17,true,5,1,memory
+      test_user_memory_add_interaction,function,"(memory:UserMemory)",21-28,true,8,1,UserMemory stores and retrieves interactions.
+      test_user_memory_get_recent,function,"(memory:UserMemory)",32-42,true,11,2,UserMemory returns most recent interactions up to limit.
+      test_user_memory_preferences,function,"(memory:UserMemory)",46-53,true,8,1,UserMemory stores and retrieves preferences.
+      test_user_memory_preference_update,function,"(memory:UserMemory)",57-63,true,7,1,UserMemory overwrites preferences on update.
+      test_user_memory_sqlite_backend,function,"(tmp_path:Path)",67-73,true,7,1,UserMemory creates SQLite file on disk.
+      test_user_memory_empty_history,function,"(memory:UserMemory)",77-83,true,7,1,UserMemory returns empty list for no interactions.
+      test_user_memory_clear,function,"(memory:UserMemory)",87-94,true,8,1,UserMemory.clear() removes all data.
   tests/test_v2_architecture.py:
     functions[43]{name,kind,sig,loc,async,lines,cc,does}:
       TestLLMProvider.test_init_with_config,method,(),34-38,false,5,1,checks init with config
@@ -341,6 +413,23 @@ function_details:
       TestConfigLoading.test_shipped_config_loads,method,(),172-178,false,7,2,checks shipped config loads
       TestProcessModels.test_process_step_with_strategy,method,(),182-190,false,9,1,checks process step with strategy
       TestProcessModels.test_process_config,method,(),192-201,false,10,1,checks process config
+  tests/test_v3_architecture.py:
+    functions[15]{name,kind,sig,loc,async,lines,cc,does}:
+      tmp_configs,function,"(tmp_path:Path) -> dict[str, Path]",34-97,false,64,2,Create all config files needed for v0.3 integration tests.
+      mock_small_llm,function,() -> LLMProvider,101-108,false,8,1,mock small llm
+      mock_large_llm,function,() -> LLMProvider,112-116,false,5,1,mock large llm
+      test_agents_integration_full_pipeline,function,"(tmp_configs, mock_small_llm, mock_large_llm)",124-151,true,28,1,"Full integration: PreprocessorAgent → ExecutorAgent with real configs."
+      test_agents_integration_structure_pipeline,function,"(tmp_configs, mock_small_llm, mock_large_llm)",155-190,true,36,1,Integration with multi-step structure pipeline.
+      test_agents_integration_dual_agent_full,function,"(tmp_configs, mock_small_llm, mock_large_llm)",194-218,true,25,3,Integration with full dual-agent pipeline (4 steps including algo).
+      test_preprocessor_independent_of_executor,function,"(tmp_configs, mock_small_llm)",226-242,true,17,1,PreprocessorAgent works without any ExecutorAgent.
+      test_executor_independent_of_preprocessor,function,(mock_large_llm),246-251,true,6,1,"ExecutorAgent works with a raw string, no preprocessing needed."
+      test_executor_with_schema_validation,function,"(tmp_configs, mock_large_llm)",259-269,true,11,1,ExecutorAgent validates JSON responses against schema.
+      test_pipeline_with_validator_integration,function,"(tmp_configs, mock_small_llm)",273-292,true,20,1,Pipeline steps produce data that passes schema validation.
+      test_passthrough_pipeline_integration,function,"(tmp_configs, mock_small_llm, mock_large_llm)",300-320,true,21,1,Passthrough pipeline forwards query directly to executor.
+      test_registry_validates_against_pipeline_needs,function,(tmp_configs),327-331,false,5,1,All prompts referenced by pipelines exist in the registry.
+      test_all_configs_load_without_error,function,(tmp_configs),334-340,false,7,1,All YAML configs load without parsing errors.
+      test_preprocessor_tracks_pipeline_steps,function,"(tmp_configs, mock_small_llm)",348-367,true,20,2,PreprocessorAgent decomposition tracks which steps executed (for cost attributio...
+      test_executor_tracks_model_used,function,(mock_large_llm),371-375,true,5,1,ExecutorAgent records which model was used (for cost attribution).
   tests/test_integration.py:
     functions[22]{name,kind,sig,loc,async,lines,cc,does}:
       TestYAMLConfigLoading._write_yaml,method,"(data:dict) -> str",28-32,false,5,1,logs yaml
@@ -409,12 +498,22 @@ function_details:
       sortColumn,function,(th),59-110,false,52,1,sorts column
   prellm/chains/process_chain.py:
     functions[6]{name,kind,sig,loc,async,lines,cc,does}:
-      ProcessChain.__init__,method,"(config_path:Any=None, config:Any=None, guard_config_path:Any=None, guard:Any=None, engine:Any=None)",55-79,false,25,5,creates
-      ProcessChain.execute,method,"(extra_context:Any=None, approval_callback:Any=None, dry_run:bool=False) -> ProcessResult",81-135,true,55,6,Execute the full process chain.
-      ProcessChain._execute_step,method,"(step:ProcessStep, ctx:dict[str,str], approval_callback:Any, dry_run:bool) -> StepResult",137-219,true,83,15,Execute a single step in the chain.
-      ProcessChain.get_audit_log,method,"() -> list[dict[str, Any]]",221-222,false,2,2,retrieves audit log
-      ProcessChain._audit_step,method,"(step_name:str, prompt:str, response:str) -> None",224-232,false,9,2,audit step
-      ProcessChain._load_process_config,method,"(path:Path) -> ProcessConfig",235-248,false,14,3,retrieves process config
+      ProcessChain.__init__,method,"(config_path:Any=None, config:Any=None, guard_config_path:Any=None, guard:Any=None, engine:Any=None)",56-80,false,25,5,creates
+      ProcessChain.execute,method,"(extra_context:Any=None, approval_callback:Any=None, dry_run:bool=False) -> ProcessResult",82-136,true,55,6,Execute the full process chain.
+      ProcessChain._execute_step,method,"(step:ProcessStep, ctx:dict[str,str], approval_callback:Any, dry_run:bool) -> StepResult",138-227,true,90,17,Execute a single step in the chain.
+      ProcessChain.get_audit_log,method,"() -> list[dict[str, Any]]",229-230,false,2,2,retrieves audit log
+      ProcessChain._audit_step,method,"(step_name:str, prompt:str, response:str) -> None",232-240,false,9,2,audit step
+      ProcessChain._load_process_config,method,"(path:Path) -> ProcessConfig",243-256,false,14,3,retrieves process config
+  prellm/context/user_memory.py:
+    functions[8]{name,kind,sig,loc,async,lines,cc,does}:
+      UserMemory.__init__,method,"(backend:str='sqlite', path:Any=_DEFAULT_DB_PATH)",31-37,false,7,2,creates
+      UserMemory._init_sqlite,method,() -> None,39-60,false,22,1,Initialize SQLite database and tables.
+      UserMemory.add_interaction,method,"(query:str, response_summary:str, metadata:Any=None) -> None",62-73,true,12,3,Record a user interaction.
+      UserMemory.get_recent_context,method,"(query:str, limit:int=5) -> list[dict[str, Any]]",75-97,true,23,3,"Get the most recent interactions, optionally filtered by relevance to query."
+      UserMemory.get_user_preferences,method,"() -> dict[str, str]",99-104,true,6,3,Get all learned user preferences.
+      UserMemory.set_preference,method,"(key:str, value:str) -> None",106-114,true,9,2,Set a user preference.
+      UserMemory.clear,method,() -> None,116-122,true,7,2,Clear all stored data (for testing).
+      UserMemory.close,method,() -> None,124-128,false,5,2,Close the database connection.
   prellm/analyzers/bias_detector.py:
     functions[2]{name,kind,sig,loc,async,lines,cc,does}:
       BiasDetector.__init__,method,"(patterns:Any=None)",38-49,false,12,4,creates
@@ -427,3 +526,14 @@ function_details:
       ContextEngine._gather_env,method,"(keys:list[str]) -> dict[str, str]",46-52,false,7,3,gather env
       ContextEngine._gather_git,method,"(fields:list[str]) -> dict[str, str]",55-74,false,20,5,gather git
       ContextEngine._gather_system,method,"(fields:list[str]) -> dict[str, str]",77-90,false,14,3,gather system
+  prellm/agents/preprocessor.py:
+    functions[4]{name,kind,sig,loc,async,lines,cc,does}:
+      PreprocessorAgent.__init__,method,"(small_llm:LLMProvider, registry:PromptRegistry, pipeline:PromptPipeline, context_engine:Any=None)",50-60,false,11,2,creates
+      PreprocessorAgent.preprocess,method,"(query:str, user_context:Any=None, pipeline_name:Any=None) -> PreprocessResult",62-98,true,37,3,Preprocess a query and return structured input for the Executor.
+      PreprocessorAgent._extract_executor_input,method,"(query:str, pipeline_result:PipelineResult) -> str",101-115,false,15,5,Extract the best executor input from pipeline state.
+      PreprocessorAgent._extract_confidence,method,"(pipeline_result:PipelineResult) -> float",118-123,false,6,2,Extract confidence score from classification step if available.
+  prellm/agents/executor.py:
+    functions[3]{name,kind,sig,loc,async,lines,cc,does}:
+      ExecutorAgent.__init__,method,"(large_llm:LLMProvider, response_validator:Any=None, response_schema_name:Any=None)",46-54,false,9,1,creates
+      ExecutorAgent.execute,method,"(executor_input:str, system_prompt:str='') -> ExecutorResult",56-100,true,45,6,Execute the task with the large LLM.
+      ExecutorAgent._validate_response,method,"(content:str) -> ValidationResult | None",102-118,false,17,5,Validate response content against the configured schema.

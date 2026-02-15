@@ -1,17 +1,20 @@
-# prellm | 30f 7543L | python:29/javascript:1
+# prellm | 41f 9184L | python:40/javascript:1
 # Keys: M=modules, D=details, i=imports, c=classes, f=functions, m=methods
-M[30]:
+M[41]:
   examples/python_sdk.py,163
   prellm/env_config.py,145
   prellm/cli.py,357
-  prellm/server.py,330
-  prellm/__init__.py,48
+  prellm/server.py,344
+  prellm/__init__.py,67
   prellm/query_decomposer.py,231
   prellm/prompt_registry.py,136
+  prellm/validators.py,162
   prellm/models.py,198
-  prellm/core.py,389
+  prellm/core.py,484
   prellm/llm_provider.py,110
   prellm/pipeline.py,290
+  tests/test_executor_agent.py,78
+  tests/test_preprocessor_agent.py,94
   tests/test_one_function.py,307
   tests/test_edge_cases.py,78
   tests/test_promptguard.py,159
@@ -19,18 +22,26 @@ M[30]:
   tests/test_decomposer.py,187
   tests/test_env_config.py,244
   tests/__init__.py,0
+  tests/test_validators.py,138
   tests/test_context.py,44
+  tests/test_user_memory.py,68
   tests/test_v2_architecture.py,519
   tests/test_models.py,172
+  tests/test_v3_architecture.py,283
   tests/test_integration.py,194
   tests/test_prompt_registry.py,119
   tests/test_pipeline.py,293
   htmlcov/coverage_html_cb_dd2e7eb5.js,555
   prellm/chains/__init__.py,0
-  prellm/chains/process_chain.py,194
+  prellm/chains/process_chain.py,202
+  prellm/context/user_memory.py,109
+  prellm/context/__init__.py,3
   prellm/analyzers/bias_detector.py,76
   prellm/analyzers/__init__.py,0
   prellm/analyzers/context_engine.py,75
+  prellm/agents/preprocessor.py,93
+  prellm/agents/__init__.py,9
+  prellm/agents/executor.py,93
 D:
   examples/python_sdk.py:
     i: asyncio
@@ -90,6 +101,12 @@ D:
     PromptEntry: __init__(4),__repr__(0)  # Single prompt entry with template, ma...
     PromptRegistry: __init__(1),_ensure_loaded(0),_load(0),get(1),get_entry(1)  # Loads prompts from YAML, caches, vali...
     _StrictUndefined:   # Custom undefined that allows `default...
+  prellm/validators.py:
+    i: logging,yaml,pathlib.Path,pydantic.{BaseModel,Field},typing.{Any,Callable}
+    e: _DEFAULT_SCHEMAS_PATH,ValidationResult,SchemaDefinition,ResponseValidator
+    ValidationResult:   # Result of validating data against a s...
+    SchemaDefinition:   # Parsed schema definition from YAML.
+    ResponseValidator: __init__(1),_ensure_loaded(0),_load(0),list_schemas(0),validate(2)  # Validates LLM responses against YAML-...
   prellm/models.py:
     i: enum,datetime,pydantic.{BaseModel,Field},typing.Any
     e: Policy,ApprovalMode,StepStatus,DecompositionStrategy,BiasPattern,ModelConfig,GuardConfig,AnalysisResult
@@ -100,11 +117,12 @@ D:
     BiasPattern: 
   prellm/core.py:
     i: logging,datetime,yaml,pathlib.Path,prellm.analyzers.bias_detector.BiasDetector,prellm.analyzers.context_engine.ContextEngine,prellm.llm_provider.LLMProvider,prellm.models.{AuditEntry,BiasPattern},typing.Any
-    e: preprocess_and_execute,preprocess_and_execute_sync,PreLLM,prellm
-    PreLLM: __init__(2),__call__(3),decompose_only(3),get_audit_log(0),_audit(3)  # preLLM v0.2 — small LLM decomposition...
+    e: preprocess_and_execute,preprocess_and_execute_sync,preprocess_and_execute_v3,PreLLM,prellm
+    PreLLM: __init__(2),__call__(3),decompose_only(3),get_audit_log(0),_audit(3)  # preLLM v0.2/v0.3 — small LLM decompos...
     prellm: __init__(2),__call__(3),analyze_only(1),get_audit_log(0),_audit(4)  # v0.1 Prellm middleware — analyze, enr...
     preprocess_and_execute(query:str;small_llm:str='ollama/qwen2.5:3b';large_llm:str='anthropic/claude-sonnet-4-20250514';strategy:Any='classify';user_context:Any=None;config_path:Any=None;...+1)->PreLLMResponse
     preprocess_and_execute_sync(query:str;small_llm:str='ollama/qwen2.5:3b';large_llm:str='anthropic/claude-sonnet-4-20250514';strategy:Any='classify';user_context:Any=None;config_path:Any=None;...+1)->PreLLMResponse
+    preprocess_and_execute_v3(query:str;small_llm:str='ollama/qwen2.5:3b';large_llm:str='anthropic/claude-sonnet-4-20250514';pipeline:str='classify';user_context:Any=None;config_path:Any=None;...+1)->PreLLMResponse
   prellm/llm_provider.py:
     i: json,logging,prellm.models.LLMProviderConfig,typing.Any
     e: LLMProvider
@@ -117,6 +135,28 @@ D:
     StepExecutionResult:   # Result of executing a single pipeline...
     PipelineResult:   # Result of executing a full pipeline.
     PromptPipeline: __init__(4),from_yaml(5),execute(2),_execute_llm_step(2),_execute_algo_step(2)  # Generic pipeline — executes a sequenc...
+  tests/test_executor_agent.py:
+    i: pytest,yaml,pathlib.Path,prellm.agents.executor.{ExecutorAgent,ExecutorResult},prellm.llm_provider.LLMProvider,prellm.models.LLMProviderConfig,prellm.validators.ResponseValidator,unittest.mock.{AsyncMock,MagicMock}
+    e: mock_large_llm,sample_schemas_yaml,validator,agent,test_executor_agent_calls_large_llm,test_executor_agent_retry_fallback,test_executor_agent_schema_validation,test_executor_agent_no_validation_by_default
+    mock_large_llm()->LLMProvider
+    sample_schemas_yaml(tmp_path:Path)->Path
+    validator(sample_schemas_yaml:Path)->ResponseValidator
+    agent(mock_large_llm:LLMProvider)->ExecutorAgent
+    test_executor_agent_calls_large_llm(agent:ExecutorAgent;mock_large_llm:LLMProvider)
+    test_executor_agent_retry_fallback(mock_large_llm:LLMProvider)
+    test_executor_agent_schema_validation(mock_large_llm:LLMProvider;validator:ResponseValidator)
+    test_executor_agent_no_validation_by_default(agent:ExecutorAgent)
+  tests/test_preprocessor_agent.py:
+    i: pytest,yaml,pathlib.Path,prellm.agents.preprocessor.{PreprocessResult,PreprocessorAgent},prellm.analyzers.context_engine.ContextEngine,prellm.llm_provider.LLMProvider,unittest.mock.{AsyncMock,MagicMock,patch}
+    e: sample_prompts_yaml,registry,mock_llm,pipeline,agent,test_preprocessor_agent_returns_structured_input,test_preprocessor_agent_context_gathering,test_preprocessor_agent_pipeline_execution
+    sample_prompts_yaml(tmp_path:Path)->Path
+    registry(sample_prompts_yaml:Path)->PromptRegistry
+    mock_llm()->LLMProvider
+    pipeline(registry:PromptRegistry;mock_llm:LLMProvider)->PromptPipeline
+    agent(mock_llm:LLMProvider;registry:PromptRegistry;pipeline:PromptPipeline)->PreprocessorAgent
+    test_preprocessor_agent_returns_structured_input(agent:PreprocessorAgent)
+    test_preprocessor_agent_context_gathering(mock_llm:LLMProvider;registry:PromptRegistry;pipeline:PromptPipeline)
+    test_preprocessor_agent_pipeline_execution(agent:PreprocessorAgent)
   tests/test_one_function.py:
     i: pytest,prellm.core.{preprocess_and_execute,preprocess_and_execute_sync},prellm.models.{DecompositionStrategy,DomainRule,PreLLMResponse},unittest.mock.{AsyncMock,MagicMock,patch}
     e: TestPreprocessAndExecute,TestPreprocessAndExecuteSync,TestImportFromPackage
@@ -162,10 +202,32 @@ D:
     TestCheckProviders: test_check_with_keys(0),test_check_without_keys(0)
     TestAuthMiddleware: test_no_auth_when_no_master_key(0),test_auth_required_when_master_key_set(0),test_auth_with_bearer_token(0),test_auth_with_x_api_key(0),test_wrong_key_rejected(0)  # Test Bearer token auth in the API ser...
     _mock_resp(content:str)->MagicMock
+  tests/test_validators.py:
+    i: pytest,yaml,pathlib.Path,prellm.validators.{ResponseValidator,ValidationResult}
+    e: sample_schemas_yaml,validator,test_validator_loads_schemas,test_validator_passes_valid_classification,test_validator_rejects_invalid_confidence,test_validator_rejects_negative_confidence,test_validator_rejects_missing_required,test_validator_enum_constraint
+    sample_schemas_yaml(tmp_path:Path)->Path
+    validator(sample_schemas_yaml:Path)->ResponseValidator
+    test_validator_loads_schemas(validator:ResponseValidator)
+    test_validator_passes_valid_classification(validator:ResponseValidator)
+    test_validator_rejects_invalid_confidence(validator:ResponseValidator)
+    test_validator_rejects_negative_confidence(validator:ResponseValidator)
+    test_validator_rejects_missing_required(validator:ResponseValidator)
+    test_validator_enum_constraint(validator:ResponseValidator)
   tests/test_context.py:
     i: pytest,prellm.analyzers.context_engine.ContextEngine
     e: TestContextEngine
     TestContextEngine: test_env_context(1),test_enrich_prompt(1),test_extra_overrides_env(1),test_missing_env_graceful(0),test_system_context(0)
+  tests/test_user_memory.py:
+    i: pytest,pathlib.Path,prellm.context.user_memory.UserMemory
+    e: memory,test_user_memory_add_interaction,test_user_memory_get_recent,test_user_memory_preferences,test_user_memory_preference_update,test_user_memory_sqlite_backend,test_user_memory_empty_history,test_user_memory_clear
+    memory(tmp_path:Path)->UserMemory
+    test_user_memory_add_interaction(memory:UserMemory)
+    test_user_memory_get_recent(memory:UserMemory)
+    test_user_memory_preferences(memory:UserMemory)
+    test_user_memory_preference_update(memory:UserMemory)
+    test_user_memory_sqlite_backend(tmp_path:Path)
+    test_user_memory_empty_history(memory:UserMemory)
+    test_user_memory_clear(memory:UserMemory)
   tests/test_v2_architecture.py:
     i: json,pytest,prellm.models.{ClassificationResult,DecompositionPrompts,DecompositionResult,DecompositionStrategy,DomainRule},unittest.mock.{AsyncMock,MagicMock,patch}
     e: TestLLMProvider,TestQueryDecomposer,TestDomainRule,TestPreLLMConfig,TestPreLLMCore,TestPreLLMConfigLoading,TestProcessChainV2,TestDecompositionResult
@@ -182,6 +244,17 @@ D:
     TestDecompositionStrategy: test_all_strategies_exist(0),test_strategy_from_string(0)
     TestConfigLoading: _write_yaml(1),test_load_minimal_config(0),test_load_with_models(0),test_load_with_domain_rules(0),test_load_with_prompts(0)
     TestProcessModels: test_process_step_with_strategy(0),test_process_config(0)
+  tests/test_v3_architecture.py:
+    i: pytest,yaml,pathlib.Path,prellm.agents.executor.{ExecutorAgent,ExecutorResult},prellm.agents.preprocessor.{PreprocessResult,PreprocessorAgent},unittest.mock.{AsyncMock,MagicMock,patch}
+    e: tmp_configs,mock_small_llm,mock_large_llm,test_agents_integration_full_pipeline,test_agents_integration_structure_pipeline,test_agents_integration_dual_agent_full,test_preprocessor_independent_of_executor,test_executor_independent_of_preprocessor
+    tmp_configs(tmp_path:Path)->dict[str, Path]
+    mock_small_llm()->LLMProvider
+    mock_large_llm()->LLMProvider
+    test_agents_integration_full_pipeline(tmp_configs;mock_small_llm;mock_large_llm)
+    test_agents_integration_structure_pipeline(tmp_configs;mock_small_llm;mock_large_llm)
+    test_agents_integration_dual_agent_full(tmp_configs;mock_small_llm;mock_large_llm)
+    test_preprocessor_independent_of_executor(tmp_configs;mock_small_llm)
+    test_executor_independent_of_preprocessor(mock_large_llm)
   tests/test_integration.py:
     i: os,tempfile,pytest,yaml,pathlib.Path,prellm.chains.process_chain.ProcessChain,prellm.core.prellm,unittest.mock.{AsyncMock,MagicMock,patch}
     e: TestYAMLConfigLoading,TestAnalyzeOnly,TestProcessChainDryRun,TestDeployConfig
@@ -212,7 +285,7 @@ D:
     test_pipeline_conditional_step_skip(registry:PromptRegistry;mock_llm:LLMProvider)
     test_pipeline_conditional_step_executes(registry:PromptRegistry;mock_llm:LLMProvider)
   htmlcov/coverage_html_cb_dd2e7eb5.js:
-    e: debounce,on_click,checkVisible,sortColumn,rowComparator,getCellValue
+    e: on_click,checkVisible,debounce,sortColumn,getCellValue,rowComparator
     debounce(callback;wait)
     checkVisible(element)
     on_click(sel;fn)
@@ -223,6 +296,10 @@ D:
     i: logging,time,datetime,yaml,pathlib.Path,prellm.analyzers.context_engine.ContextEngine,typing.{Any,Awaitable,Callable,Union}
     e: ProcessChain
     ProcessChain: __init__(5),execute(3),_execute_step(4),get_audit_log(0),_audit_step(3)  # Execute multi-step DevOps workflows w...
+  prellm/context/user_memory.py:
+    i: json,logging,sqlite3,time,pathlib.Path,typing.Any
+    e: _DEFAULT_DB_PATH,UserMemory
+    UserMemory: __init__(2),_init_sqlite(0),add_interaction(3),get_recent_context(2),get_user_preferences(0)  # Stores user query history and learned...
   prellm/analyzers/bias_detector.py:
     i: re,prellm.models.{AnalysisResult,BiasPattern},typing.Any
     e: DEFAULT_PATTERNS,BiasDetector
@@ -231,3 +308,13 @@ D:
     i: os,subprocess,typing.Any
     e: ContextEngine
     ContextEngine: __init__(1),gather(0),enrich_prompt(2),_gather_env(1),_gather_git(1)  # Collects context from environment, gi...
+  prellm/agents/preprocessor.py:
+    i: logging,prellm.analyzers.context_engine.ContextEngine,prellm.llm_provider.LLMProvider,prellm.pipeline.{PipelineResult,PromptPipeline},prellm.prompt_registry.PromptRegistry,pydantic.{BaseModel,Field},typing.Any
+    e: PreprocessResult,PreprocessorAgent
+    PreprocessResult:   # Output of the PreprocessorAgent — str...
+    PreprocessorAgent: __init__(4),preprocess(3),_extract_executor_input(2),_extract_confidence(1)  # Agent preprocessing — small LLM (≤24B...
+  prellm/agents/executor.py:
+    i: logging,prellm.llm_provider.LLMProvider,prellm.validators.{ResponseValidator,ValidationResult},pydantic.{BaseModel,Field},typing.Any
+    e: ExecutorResult,ExecutorAgent
+    ExecutorResult:   # Output of the ExecutorAgent.
+    ExecutorAgent: __init__(3),execute(2),_validate_response(1)  # Agent execution — large LLM (>24B) ex...

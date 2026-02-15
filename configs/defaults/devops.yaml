@@ -1,0 +1,85 @@
+# preLLM — DevOps domain defaults
+# Deploy, K8s, monitoring, CI/CD, infrastructure
+
+domain: devops
+
+small_model:
+  model: "ollama/qwen2.5:3b"
+  max_tokens: 512
+  temperature: 0.0
+
+large_model:
+  model: "anthropic/claude-sonnet-4-20250514"
+  max_tokens: 4096
+  temperature: 0.3
+
+default_pipeline: structure
+
+domain_rules:
+  - name: deploy
+    keywords: [deploy, deployment, release, rollout, ship]
+    intent: deploy
+    required_fields: [environment, version, rollback_plan]
+    enrich_template: "Specify target environment, version, and rollback strategy for: {query}"
+    severity: high
+    strategy: structure
+
+  - name: kubernetes
+    keywords: [k8s, kubernetes, pod, deployment, service, ingress, helm]
+    intent: configure
+    required_fields: [cluster, namespace, resource_type]
+    enrich_template: "Specify K8s cluster, namespace, and resource type for: {query}"
+    severity: high
+    strategy: structure
+
+  - name: monitoring
+    keywords: [monitor, alert, grafana, prometheus, metric, dashboard, observability]
+    intent: monitor
+    required_fields: [target_service, metric_type]
+    enrich_template: "Specify which service and metrics to monitor: {query}"
+    severity: medium
+    strategy: classify
+
+  - name: ci_cd
+    keywords: [pipeline, ci, cd, github actions, gitlab, jenkins, build, test]
+    intent: configure
+    required_fields: [repository, trigger_event]
+    enrich_template: "Specify repository and trigger conditions for: {query}"
+    severity: medium
+    strategy: structure
+
+  - name: rollback
+    keywords: [rollback, revert, undo, restore, previous version]
+    intent: rollback
+    required_fields: [environment, target_version]
+    enrich_template: "Specify environment and target version to rollback to: {query}"
+    severity: high
+    strategy: structure
+
+prompts:
+  classify:
+    system: |
+      You are a DevOps query classifier. Analyze the query and determine intent.
+      Possible intents: deploy, configure, monitor, scale, rollback, migrate, other.
+      Respond ONLY with JSON: {"intent": "...", "confidence": 0.0-1.0, "domain": "devops"}
+    max_tokens: 256
+    temperature: 0.1
+
+  compose:
+    system: |
+      You are a DevOps prompt composer. Given classification and context,
+      compose an optimal prompt for a large LLM to execute the DevOps task.
+      Include: environment details, safety checks, rollback plan, monitoring.
+      Return only the composed prompt text.
+    max_tokens: 1024
+    temperature: 0.2
+
+response_schemas:
+  classification:
+    required_fields: [intent, confidence]
+    types:
+      intent: string
+      confidence: float
+    constraints:
+      confidence: {min: 0.0, max: 1.0}
+      intent: {enum: [deploy, configure, monitor, scale, rollback, migrate, other]}

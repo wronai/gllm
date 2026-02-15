@@ -62,6 +62,7 @@ class PreLLMExtras(BaseModel):
     """preLLM-specific extensions in the request body."""
     user_context: str | dict[str, str] | None = None
     strategy: str | None = None
+    pipeline: str | None = None          # v0.3: pipeline name from pipelines.yaml
     response_format: str | None = None  # "yaml" | "json" | None
     show_stages: bool = False
     domain_rules: list[dict[str, Any]] | None = None
@@ -93,6 +94,7 @@ class PreLLMMeta(BaseModel):
     small_model: str = ""
     large_model: str = ""
     strategy: str = ""
+    pipeline: str | None = None           # v0.3: pipeline name used
     intent: str | None = None
     confidence: float | None = None
     matched_rule: str | None = None
@@ -293,7 +295,7 @@ async def chat_completions(req: ChatCompletionRequest):
             media_type="text/event-stream",
         )
 
-    # Non-streaming
+    # Non-streaming — unified call (routes to v3 when pipeline is set)
     result = await preprocess_and_execute(
         query=user_query,
         small_llm=small,
@@ -302,10 +304,13 @@ async def chat_completions(req: ChatCompletionRequest):
         user_context=extras.user_context,
         domain_rules=extras.domain_rules,
         config_path=CONFIG_PATH,
+        pipeline=extras.pipeline,
         **kwargs,
     )
 
     meta = _build_prellm_meta(result, strategy)
+    if extras.pipeline:
+        meta.pipeline = extras.pipeline
 
     return ChatCompletionResponse(
         model=req.model,
