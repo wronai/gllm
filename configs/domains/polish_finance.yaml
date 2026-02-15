@@ -1,0 +1,78 @@
+# preLLM Domain Config — Polish Finance / Leasing
+# Use case: "Stwórz kalkulator leasingu camper van PLN"
+#
+# Usage:
+#   result = await preprocess_and_execute("Kalkulacja leasingu", config_path="configs/domains/polish_finance.yaml")
+
+small_model:
+  model: "ollama/qwen2.5:3b"
+  max_tokens: 512
+  temperature: 0.0
+
+large_model:
+  model: "gpt-4o-mini"
+  max_tokens: 4096
+  temperature: 0.2
+
+default_strategy: structure
+
+domain_rules:
+  - name: leasing_pl
+    keywords: [leasing, rata, raty, wibor, vat, faktura, harmonogram, wykup, wpłata, oprocentowanie]
+    intent: calculate
+    required_fields: [kwota_netto, okres_miesiecy, vat_rate, oprocentowanie]
+    severity: medium
+    strategy: structure
+
+  - name: faktura_pl
+    keywords: [faktura, nip, ksef, jpk, vat, sprzedawca, nabywca, pozycje]
+    intent: document
+    required_fields: [sprzedawca_nip, nabywca_nip, pozycje]
+    severity: medium
+    strategy: structure
+
+  - name: kredyt_pl
+    keywords: [kredyt, hipoteka, zdolność, rata, bank, rrso, marża]
+    intent: calculate
+    required_fields: [kwota, okres_lat, oprocentowanie, typ_rat]
+    severity: medium
+    strategy: structure
+
+  - name: podatek_pl
+    keywords: [podatek, pit, cit, vat, zus, składka, rozliczenie, deklaracja]
+    intent: calculate
+    required_fields: [typ_podatku, okres, kwota_przychodu]
+    severity: high
+    strategy: enrich
+
+  - name: inwestycja_pl
+    keywords: [inwestycja, lokata, obligacja, fundusz, giełda, dywidenda, zysk]
+    intent: calculate
+    required_fields: [kwota, horyzont, profil_ryzyka]
+    severity: low
+    strategy: classify
+
+prompts:
+  classify: |
+    Jesteś ekspertem finansowym specjalizującym się w polskim prawie podatkowym i finansowym.
+    Sklasyfikuj zapytanie użytkownika.
+    Odpowiedz JSON: {"intent": "calculate|document|analyze|advise", "confidence": 0.0-1.0, "domain": "finance_pl"}
+  structure: |
+    Wyodrębnij pola finansowe z zapytania. Uwzględnij polskie realia:
+    - VAT: 23%, 8%, 5%, 0%, zw.
+    - WIBOR 3M/6M jako bazowa stopa
+    - Waluta: PLN (domyślnie)
+    Odpowiedz JSON: {"action": "...", "target": "...", "parameters": {"kwota": ..., "waluta": "PLN", "vat_rate": ..., "okres": ..., "stopa": ...}}
+  enrich: |
+    Zapytanie wymaga dodatkowego kontekstu finansowego. Dodaj:
+    - Aktualny WIBOR (jeśli dotyczy)
+    - Obowiązujące stawki VAT
+    - Limity podatkowe (kwota wolna, progi)
+    Odpowiedz JSON: {"enriched_query": "...", "added_context": [...], "missing_critical": [...]}
+
+context_sources:
+  - env: [CURRENCY, TAX_YEAR]
+  - system: [hostname]
+
+policy: strict
+max_retries: 3

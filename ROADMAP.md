@@ -88,16 +88,29 @@ Cost: $0.015 + $0.52 = $0.535
 - [x] 5 decomposition strategies (classify, structure, split, enrich, passthrough)
 - [x] YAML-driven domain rules + prompts
 - [x] Pydantic v2 validated responses
-- [ ] 20+ popular model pairs (Qwen→Claude, Llama→GPT, Phi→Mistral)
+- [x] 100+ model providers via LiteLLM (Ollama, OpenAI, Anthropic, Groq, Mistral, Azure, Bedrock, Gemini, Together, DeepSeek)
 - [ ] GitHub CI: ruff + mypy + pytest + 100% coverage
 - [ ] PyPI stable release
 
+### Month 3–4: Two-Agent Architecture v0.3 ✅
+- [x] **PreprocessorAgent** (small LLM ≤24B) + **ExecutorAgent** (large LLM)
+- [x] **PromptRegistry** — YAML prompts with Jinja2 templating
+- [x] **PromptPipeline** — YAML-configurable multi-step pipelines (LLM + algorithmic steps)
+- [x] **ResponseValidator** — YAML schema validation for LLM outputs
+- [x] **UserMemory** — SQLite-backed user interaction history
+- [x] Unified `preprocess_and_execute()` — `strategy=` (v0.2) or `pipeline=` (v0.3)
+- [x] 6 built-in pipelines: classify, structure, split, enrich, dual_agent_full, passthrough
+- [x] Per-domain default configs: devops, coding, business, embedded
+- [x] 219+ tests (65 new for v0.3 architecture)
+- [x] LiteLLM integration guide + provider examples
+- [x] OpenAI SDK-compatible server with pipeline support
+
 ### Month 4–6: Proxy Server (target: 30k ⭐)
-- [ ] FastAPI proxy server (OpenAI-compatible `/v1/chat/completions`)
+- [x] FastAPI proxy server (OpenAI-compatible `/v1/chat/completions`)
+- [x] Streaming SSE support with stage progress
 - [ ] Docker 1-liner: `docker run -p 8080:8080 prellm/prellm`
 - [ ] Load testing + stable Docker tags
-- [ ] ChromaDB user context memory
-- [ ] Response schema contracts (YAML)
+- [ ] ChromaDB user context memory (upgrade from SQLite MVP)
 - [ ] Budget tracking / spend limits
 
 ### Month 7–12: Enterprise (target: 100k+ ⭐)

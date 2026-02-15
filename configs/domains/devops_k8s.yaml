@@ -1,0 +1,75 @@
+# preLLM Domain Config — Kubernetes / DevOps Debugging
+# Use case: "Dlaczego mój RPi K8s cluster ciągle pada?"
+#
+# Usage:
+#   result = await preprocess_and_execute("K8s pods crashing", config_path="configs/domains/devops_k8s.yaml")
+
+small_model:
+  model: "ollama/qwen2.5:3b"
+  max_tokens: 512
+  temperature: 0.0
+
+large_model:
+  model: "anthropic/claude-sonnet-4-20250514"
+  max_tokens: 4096
+  temperature: 0.3
+
+default_strategy: structure
+
+domain_rules:
+  - name: k8s_debug
+    keywords: [crashloop, crashloopbackoff, oom, oomkilled, imagepull, imagepullbackoff, pod, deployment, service, ingress, restart, evicted]
+    intent: debug
+    required_fields: [cluster_info, namespace, pod_name, error_type]
+    severity: high
+    strategy: structure
+
+  - name: k8s_scale
+    keywords: [scale, replicas, hpa, autoscale, autoscaler, resource, limits, requests, cpu, memory]
+    intent: scale
+    required_fields: [target_resource, direction, limit, namespace]
+    severity: medium
+    strategy: structure
+
+  - name: k8s_deploy
+    keywords: [deploy, rollout, upgrade, helm, kustomize, argocd, gitops]
+    intent: deploy
+    required_fields: [environment, version, rollback_plan]
+    severity: critical
+    strategy: structure
+
+  - name: k8s_network
+    keywords: [network, dns, service, ingress, loadbalancer, nodeport, clusterip, calico, cilium]
+    intent: network
+    required_fields: [source, destination, protocol, port]
+    severity: high
+    strategy: enrich
+
+  - name: k8s_monitor
+    keywords: [prometheus, grafana, alert, metric, log, loki, fluentd, monitoring, observability]
+    intent: monitor
+    required_fields: [metric_type, threshold, target]
+    severity: medium
+    strategy: classify
+
+prompts:
+  classify: |
+    You are a Kubernetes diagnostician. Classify the user query.
+    Respond JSON: {"intent": "debug|scale|deploy|network|monitor|configure", "confidence": 0.0-1.0, "domain": "kubernetes"}
+  structure: |
+    Extract Kubernetes-specific fields from the query.
+    Respond JSON: {"action": "...", "target": "...", "parameters": {"cluster": "...", "namespace": "...", "resource_type": "...", "error_type": "...", "affected_pods": [...]}}
+  enrich: |
+    The user query is missing critical K8s context. Add:
+    - Cluster info (type, version, node count)
+    - Namespace and resource details
+    - Error logs or events if referenced
+    Respond JSON: {"enriched_query": "...", "added_context": [...], "missing_critical": [...]}
+
+context_sources:
+  - env: [KUBECONFIG, NAMESPACE, CLUSTER_NAME, K8S_CONTEXT]
+  - system: [hostname, os]
+  - git: [branch, short_sha]
+
+policy: devops
+max_retries: 3

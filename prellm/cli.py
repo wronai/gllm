@@ -65,46 +65,6 @@ def query(
 
 
 @app.command()
-def run(
-    query: str = typer.Argument(..., help="The prompt/query to process"),
-    config: Path = typer.Option("rules.yaml", "--config", "-c", help="Path to YAML config"),
-    model: str = typer.Option("gpt-4o-mini", "--model", "-m", help="LLM model to use"),
-    dry_run: bool = typer.Option(False, "--dry-run", "-d", help="Analyze only, don't call LLM"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
-):
-    """[v0.1 compat] Run a single query through the old Prellm pipeline."""
-    from prellm.core import prellm
-
-    guard = prellm(config_path=config)
-
-    if dry_run:
-        result = guard.analyze_only(query)
-        if json_output:
-            typer.echo(json.dumps(result, indent=2, default=str))
-        else:
-            typer.echo(f"🔍 Analysis for: {query}")
-            typer.echo(f"   Needs clarification: {result['needs_clarify']}")
-            typer.echo(f"   Patterns detected: {result['patterns']}")
-            typer.echo(f"   Ambiguity flags: {result['ambiguity_flags']}")
-            typer.echo(f"   Enriched query: {result['enriched']}")
-        return
-
-    result = asyncio.run(_run_guard(guard, query, model))
-
-    if json_output:
-        typer.echo(result.model_dump_json(indent=2))
-    else:
-        status = "✅ clarified" if result.clarified else "📝 direct"
-        typer.echo(f"\n{'='*60}")
-        typer.echo(f"🛡️  Prellm [{status}] via {result.model_used}")
-        typer.echo(f"{'='*60}")
-        typer.echo(f"\n{result.content}")
-        if result.analysis and result.analysis.detected_patterns:
-            typer.echo(f"\n⚠️  Detected: {', '.join(result.analysis.detected_patterns)}")
-        typer.echo(f"\n{'='*60}")
-
-
-@app.command()
 def process(
     config: Path = typer.Argument(..., help="Path to process chain YAML"),
     guard_config: Path = typer.Option("rules.yaml", "--guard-config", "-g", help="Path to guard YAML config"),
@@ -142,28 +102,6 @@ def process(
             if step.error:
                 typer.echo(f"      Error: {step.error}")
         typer.echo(f"{'='*60}")
-
-
-@app.command()
-def analyze(
-    query: str = typer.Argument(..., help="Query to analyze for bias/ambiguity"),
-    config: Path = typer.Option("rules.yaml", "--config", "-c", help="Path to YAML config"),
-):
-    """Analyze a query without calling any LLM (bias detection + ambiguity check)."""
-    from prellm.core import prellm
-
-    guard = prellm(config_path=config)
-    result = guard.analyze_only(query)
-
-    typer.echo(f"\n🔍 Analysis: {query}")
-    typer.echo(f"   Needs clarification: {'⚠️  YES' if result['needs_clarify'] else '✅ NO'}")
-    if result["patterns"]:
-        typer.echo(f"   Patterns: {', '.join(result['patterns'])}")
-    if result["ambiguity_flags"]:
-        typer.echo(f"   Flags: {', '.join(result['ambiguity_flags'])}")
-    if result["readability"] is not None:
-        typer.echo(f"   Readability: {result['readability']:.1f}")
-    typer.echo(f"   Enriched: {result['enriched']}")
 
 
 @app.command()
@@ -414,10 +352,6 @@ def doctor(
 
     typer.echo(f"\n{'='*60}")
     typer.echo(f"\u2705 Doctor complete. Use --live to test connectivity.\n")
-
-
-async def _run_guard(guard, query: str, model: str):
-    return await guard(query, model=model)
 
 
 if __name__ == "__main__":

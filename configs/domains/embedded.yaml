@@ -1,0 +1,78 @@
+# preLLM Domain Config — Embedded Systems / IoT
+# Use case: "Zrefaktoruj mój ESP32 monitoring system"
+#
+# Usage:
+#   result = await preprocess_and_execute("Refaktor ESP32", config_path="configs/domains/embedded.yaml")
+
+small_model:
+  model: "ollama/qwen2.5:3b"
+  max_tokens: 512
+  temperature: 0.0
+
+large_model:
+  model: "anthropic/claude-sonnet-4-20250514"
+  max_tokens: 4096
+  temperature: 0.3
+
+default_strategy: structure
+
+domain_rules:
+  - name: embedded_refactor
+    keywords: [esp32, rpi, raspberry, stm32, cortex, arduino, flash, ram, gpio, spi, i2c, uart]
+    intent: refactor
+    required_fields: [mcu_type, flash_size_kb, ram_size_kb, constraints]
+    severity: medium
+    strategy: structure
+
+  - name: firmware_build
+    keywords: [firmware, build, flash, upload, ota, platformio, espidf, cmake, toolchain]
+    intent: build
+    required_fields: [target_mcu, toolchain, flash_method]
+    severity: medium
+    strategy: structure
+
+  - name: sensor_integration
+    keywords: [sensor, adc, dac, pwm, temperature, humidity, pressure, accelerometer, gyroscope]
+    intent: integrate
+    required_fields: [sensor_type, interface, mcu_type, sampling_rate]
+    severity: low
+    strategy: classify
+
+  - name: power_optimization
+    keywords: [power, sleep, deep_sleep, battery, consumption, mah, current, voltage, ldo]
+    intent: optimize
+    required_fields: [target_consumption_ma, battery_capacity_mah, sleep_mode]
+    severity: high
+    strategy: enrich
+
+  - name: rtos_task
+    keywords: [freertos, task, queue, semaphore, mutex, priority, stack, heap, watchdog]
+    intent: configure
+    required_fields: [rtos_type, task_count, stack_size, priority_scheme]
+    severity: high
+    strategy: structure
+
+prompts:
+  classify: |
+    You are an embedded systems engineer. Classify the user query.
+    CRITICAL: Note hardware constraints (flash, RAM, clock speed, power budget).
+    Respond JSON: {"intent": "refactor|build|integrate|optimize|configure|debug", "confidence": 0.0-1.0, "domain": "embedded"}
+  structure: |
+    Extract embedded-specific fields from the query.
+    CRITICAL: Note hardware constraints (flash, RAM, clock speed).
+    Respond JSON: {"action": "...", "target": "...", "parameters": {"mcu": "...", "flash_kb": ..., "ram_kb": ..., "peripherals": [...], "constraints": [...], "toolchain": "..."}}
+  enrich: |
+    The query is missing critical hardware context. Add:
+    - MCU specifications (flash, RAM, clock)
+    - Power budget if battery-powered
+    - Communication interfaces used
+    - RTOS if applicable
+    Respond JSON: {"enriched_query": "...", "added_context": [...], "missing_critical": [...]}
+
+context_sources:
+  - env: [PLATFORMIO_BOARD, MCU_TYPE, FLASH_SIZE, RAM_SIZE]
+  - system: [hostname, os]
+  - git: [branch, short_sha]
+
+policy: strict
+max_retries: 3

@@ -488,13 +488,15 @@ class PreLLM:
 
 
 # ============================================================
-# v0.1 compat — prellm (old class, kept for backward compatibility)
+# v0.1 compat — prellm (DEPRECATED, kept for backward compatibility)
 # ============================================================
 
 class prellm:
     """v0.1 Prellm middleware — analyze, enrich, and proxy LLM calls.
 
-    DEPRECATED: Use PreLLM for v0.2 small-LLM decomposition pipeline.
+    .. deprecated:: 0.3.2
+        Use ``preprocess_and_execute()`` or ``PreLLM`` instead.
+        This class will be removed in v0.5.
 
     Usage:
         guard = prellm("rules.yaml")
@@ -506,6 +508,14 @@ class prellm:
         config_path: str | Path | None = None,
         config: GuardConfig | None = None,
     ):
+        import warnings
+        warnings.warn(
+            "prellm class is deprecated since v0.3.2. Use preprocess_and_execute() or PreLLM instead. "
+            "Will be removed in v0.5.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         if config:
             self.config = config
         elif config_path:

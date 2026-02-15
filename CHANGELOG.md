@@ -1,3 +1,81 @@
+## [0.3.5] - 2026-02-15
+
+### Summary
+
+refactor(examples): CLI interface improvements
+
+### Docs
+
+- docs: update README
+- docs: update ROADMAP.md
+
+### Test
+
+- update tests/test_one_function.py
+- update tests/test_server.py
+- update tests/test_structured_output.py
+
+### Build
+
+- update pyproject.toml
+
+### Other
+
+- config: update devops_k8s.yaml
+- config: update embedded.yaml
+- config: update polish_finance.yaml
+- update examples/embedded_refactor.py
+- update examples/k8s_debug.py
+- update examples/polish_leasing.py
+- update examples/providers.py
+- update examples/quick_start.py
+- update prellm/__init__.py
+- update prellm/chains/process_chain.py
+- ... and 3 more
+
+
+## [0.3.4] - 2026-02-15
+
+### Summary
+
+feat(core): unified API with two-agent architecture, comprehensive docs, provider examples
+
+### Added
+
+- **Unified `preprocess_and_execute()` API** — single function with two execution paths:
+  - `strategy=` (v0.2, default): strategy-based via PreLLM class
+  - `pipeline=` (v0.3): two-agent via PreprocessorAgent + ExecutorAgent + PromptPipeline
+- **PreprocessorAgent** (`prellm/agents/preprocessor.py`): small LLM preprocessing with PromptPipeline
+- **ExecutorAgent** (`prellm/agents/executor.py`): large LLM execution with ResponseValidator
+- **PromptRegistry** (`prellm/prompt_registry.py`): YAML-based prompt loading with Jinja2 templating
+- **PromptPipeline** (`prellm/pipeline.py`): YAML-configurable multi-step preprocessing pipelines
+- **ResponseValidator** (`prellm/validators.py`): YAML schema validation for LLM outputs
+- **UserMemory** (`prellm/context/user_memory.py`): SQLite-backed user interaction history
+- **Per-domain default configs**: `configs/defaults/{devops,coding,business,embedded}.yaml`
+- **YAML configs**: `configs/prompts.yaml`, `configs/pipelines.yaml`, `configs/response_schemas.yaml`
+- **6 built-in pipelines**: classify, structure, split, enrich, dual_agent_full, passthrough
+- **65 new tests** across 7 test files (all passing)
+- **12 integration tests** covering full two-agent pipeline flows
+- **README rewrite** with provider examples (Ollama, OpenAI, Anthropic, Groq, Mistral, Azure, Bedrock, Gemini, Together, DeepSeek)
+- **LiteLLM integration guide** — drop-in enhancement, env vars, proxy support
+- **OpenAI SDK compatibility** — use preLLM server from any OpenAI client
+- **Usage examples**: `examples/quick_start.py`, `examples/providers.py`
+
+### Changed
+
+- `preprocess_and_execute()` now accepts `pipeline=`, `prompts_path=`, `pipelines_path=`, `schemas_path=` parameters
+- `preprocess_and_execute_sync()` forwards all new parameters
+- `preprocess_and_execute_v3` is now a backward-compatible alias for `preprocess_and_execute`
+- Server (`prellm/server.py`): supports `prellm.pipeline` field in request body
+- ProcessChain (`prellm/chains/process_chain.py`): supports v0.3 pipeline per-step
+- `__init__.py` exports all v0.3 modules (agents, pipeline, registry, validators, memory)
+- Version bumped to 0.3.4
+
+### Fixed
+
+- Version assertion tests updated for new version
+
+
 ## [0.3.3] - 2026-02-15
 
 ### Summary

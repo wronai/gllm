@@ -105,6 +105,75 @@ class LLMProvider:
         )
         return self._parse_json(raw)
 
+    async def complete_structured(
+        self,
+        user_message: str,
+        response_model: type,
+        system_prompt: str = "",
+        max_retries: int = 2,
+        **kwargs: Any,
+    ):
+        """Complete and return a validated Pydantic model using instructor.
+
+        Requires: pip install prellm[structured]
+
+        Args:
+            user_message: The user message content.
+            response_model: A Pydantic BaseModel class to validate against.
+            system_prompt: Optional system prompt.
+            max_retries: Number of instructor retries for validation failures.
+            **kwargs: Extra kwargs passed to the LLM call.
+
+        Returns:
+            An instance of response_model, validated by instructor.
+
+        Raises:
+            ImportError: If instructor is not installed.
+        """
+        try:
+            import instructor
+        except ImportError:
+            raise ImportError(
+                "instructor is required for structured outputs. "
+                "Install with: pip install prellm[structured]"
+            )
+        import litellm
+
+        client = instructor.from_litellm(litellm.acompletion)
+
+        messages: list[dict[str, str]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": user_message})
+
+        models_to_try = [self.config.model] + [
+            m for m in self.config.fallback if m != self.config.model
+        ]
+
+        last_error: Exception | None = None
+
+        for model in models_to_try:
+            try:
+                result = await client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    response_model=response_model,
+                    max_retries=max_retries,
+                    max_tokens=self.config.max_tokens,
+                    temperature=self.config.temperature,
+                    **kwargs,
+                )
+                logger.debug(f"Structured response from {model}: {result}")
+                return result
+
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Structured completion with {model} failed: {e}")
+
+        raise RuntimeError(
+            f"All models failed for structured output. Last error: {last_error}"
+        )
+
     @staticmethod
     def _parse_json(text: str) -> dict[str, Any]:
         """Best-effort JSON extraction from LLM output."""
