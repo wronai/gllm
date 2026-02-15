@@ -1,3 +1,22 @@
+## [0.3.11] - 2026-02-15
+
+### Summary
+
+feat(docs): CLI interface improvements
+
+### Docs
+
+- docs: update README
+
+### Build
+
+- update pyproject.toml
+
+### Other
+
+- scripts: update cli_examples.sh
+
+
 ## [0.3.10] - 2026-02-15
 
 ### Summary

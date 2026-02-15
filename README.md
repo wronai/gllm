@@ -535,13 +535,76 @@ preprocess_and_execute(query, small_llm, large_llm, strategy= | pipeline=)
     └── PreLLMResponse (Pydantic v2 validated)
 ```
 
+## Examples
+
+Ready-to-run examples with tests in `examples/`:
+
+| Example | Directory | Domain Config | Tests |
+|---|---|---|---|
+| **K8s Debugging** | `examples/k8s/` | `configs/domains/devops_k8s.yaml` | 7 |
+| **Polish Leasing** | `examples/leasing/` | `configs/domains/polish_finance.yaml` | 8 |
+| **Embedded/IoT** | `examples/embedded/` | `configs/domains/embedded.yaml` | 8 |
+
+### Run Examples
+
+```bash
+# Run example (requires Ollama or API keys)
+python examples/k8s/main.py
+python examples/leasing/main.py
+python examples/embedded/main.py
+
+# Run example tests (fully mocked, no LLM needed)
+pytest examples/k8s/test_k8s.py -v
+pytest examples/leasing/test_leasing.py -v
+pytest examples/embedded/test_embedded.py -v
+
+# Run ALL tests (core + examples)
+pytest
+```
+
+### K8s Debugging
+
+```python
+from prellm import preprocess_and_execute
+
+result = await preprocess_and_execute(
+    query="Pod backend-api restartuje sie z CrashLoopBackOff",
+    config_path="configs/domains/devops_k8s.yaml",
+    strategy="structure",
+    user_context={"cluster": "k8s-prod", "namespace": "backend"},
+)
+```
+
+### Polish Leasing Calculator
+
+```python
+result = await preprocess_and_execute(
+    query="Oblicz rate leasingu operacyjnego camper van za 250000 PLN netto, 48 miesiecy",
+    config_path="configs/domains/polish_finance.yaml",
+    strategy="structure",
+)
+```
+
+### Embedded/IoT Refactoring
+
+```python
+result = await preprocess_and_execute(
+    query="Zrefaktoruj ESP32 monitoring - za duzo hardcode'ow, brak OTA",
+    config_path="configs/domains/embedded.yaml",
+    strategy="structure",
+    user_context={"mcu": "ESP32-S3", "flash": "8MB", "ram": "512KB"},
+)
+```
+
+---
+
 ## Development
 
 ```bash
 git clone https://github.com/wronai/prellm
 cd prellm
 poetry install
-poetry run pytest                 # 219+ tests
+poetry run pytest                 # 280+ tests (core + examples)
 poetry run pytest --cov           # coverage report
 poetry run ruff check prellm/     # linting
 ```
