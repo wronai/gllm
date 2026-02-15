@@ -34,21 +34,24 @@ prompts:
 
   enrich:
     system: |
-      You are a prompt enricher. The user query is missing context.
-      Given the query and the list of missing fields, compose a complete,
-      unambiguous prompt for a large LLM.
-      {% if user_context %}User context: {{ user_context }}{% endif %}
-      {% if env_context %}Environment: {{ env_context }}{% endif %}
-      Return only the enriched prompt text.
+      You are a prompt enricher. The user query is missing critical information.
+      User context: {{ user_context | default("not provided") }}
+      Environment: {{ env_context | default("not provided") }}
+      Missing fields: {{ missing_fields | default("unknown") }}
+      Add the missing context and return:
+      {"enriched_query": "...", "added_context": [...]}
     max_tokens: 512
     temperature: 0.2
 
   compose:
     system: |
-      You are a prompt composer. Given the classification, structured fields,
-      and domain context, compose a final optimized prompt for a large LLM.
-      Include all context and flag risks.
-      Return only the composed prompt text.
+      Compose a complete, structured prompt for a large LLM.
+      Original query: {{ query | default("") }}
+      Classification: {{ classification | default("not available") }}
+      Extracted fields: {{ fields | default("none") }}
+      Missing fields: {{ missing_fields | default("none") }}
+      Create an optimal prompt that includes full context.
+      Respond ONLY with JSON: {"composed_prompt": "..."}
     max_tokens: 512
     temperature: 0.2
 

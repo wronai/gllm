@@ -1,17 +1,22 @@
-# prellm | 41f 9184L | python:40/javascript:1
+# prellm | 49f 11227L | python:48/javascript:1
 # Keys: M=modules, D=details, i=imports, c=classes, f=functions, m=methods
-M[41]:
+M[49]:
+  examples/embedded_refactor.py,47
+  examples/providers.py,176
+  examples/quick_start.py,157
   examples/python_sdk.py,163
-  prellm/env_config.py,145
-  prellm/cli.py,357
-  prellm/server.py,344
+  examples/polish_leasing.py,38
+  examples/k8s_debug.py,45
+  prellm/env_config.py,326
+  prellm/cli.py,516
+  prellm/server.py,335
   prellm/__init__.py,67
   prellm/query_decomposer.py,231
   prellm/prompt_registry.py,136
   prellm/validators.py,162
   prellm/models.py,198
-  prellm/core.py,484
-  prellm/llm_provider.py,110
+  prellm/core.py,504
+  prellm/llm_provider.py,167
   prellm/pipeline.py,290
   tests/test_executor_agent.py,78
   tests/test_preprocessor_agent.py,94
@@ -24,7 +29,9 @@ M[41]:
   tests/__init__.py,0
   tests/test_validators.py,138
   tests/test_context.py,44
+  tests/test_codebase_indexer.py,115
   tests/test_user_memory.py,68
+  tests/test_structured_output.py,100
   tests/test_v2_architecture.py,519
   tests/test_models.py,172
   tests/test_v3_architecture.py,283
@@ -33,16 +40,43 @@ M[41]:
   tests/test_pipeline.py,293
   htmlcov/coverage_html_cb_dd2e7eb5.js,555
   prellm/chains/__init__.py,0
-  prellm/chains/process_chain.py,202
-  prellm/context/user_memory.py,109
-  prellm/context/__init__.py,3
+  prellm/chains/process_chain.py,230
+  prellm/context/user_memory.py,197
+  prellm/context/__init__.py,4
+  prellm/context/codebase_indexer.py,294
   prellm/analyzers/bias_detector.py,76
   prellm/analyzers/__init__.py,0
-  prellm/analyzers/context_engine.py,75
+  prellm/analyzers/context_engine.py,112
   prellm/agents/preprocessor.py,93
   prellm/agents/__init__.py,9
   prellm/agents/executor.py,93
 D:
+  examples/embedded_refactor.py:
+    i: asyncio
+    e: main
+    main()
+  examples/providers.py:
+    i: asyncio,os
+    e: run_example,ollama_local,ollama_plus_openai,ollama_plus_anthropic,openai_only,anthropic_only,groq_fast,mistral_cloud
+    run_example(name:str;small_llm:str;large_llm:str)
+    ollama_local()
+    ollama_plus_openai()
+    ollama_plus_anthropic()
+    openai_only()
+    anthropic_only()
+    groq_fast()
+    mistral_cloud()
+  examples/quick_start.py:
+    i: asyncio
+    e: example_zero_config,example_strategy_based,example_pipeline_based,example_ollama_local,example_hybrid_ollama_openai,example_hybrid_ollama_anthropic,example_domain_rules,example_sync
+    example_zero_config()
+    example_strategy_based()
+    example_pipeline_based()
+    example_ollama_local()
+    example_hybrid_ollama_openai()
+    example_hybrid_ollama_anthropic()
+    example_domain_rules()
+    example_sync()
   examples/python_sdk.py:
     i: asyncio
     e: example_one_function,example_domain_rules,example_sync,example_class_based,example_openai_sdk,example_batch,example_strategies,main
@@ -54,25 +88,37 @@ D:
     example_batch()
     example_strategies()
     main()
+  examples/polish_leasing.py:
+    i: asyncio
+    e: main
+    main()
+  examples/k8s_debug.py:
+    i: asyncio
+    e: main
+    main()
   prellm/env_config.py:
     i: logging,os,dataclasses.{dataclass,field},pathlib.Path,typing.Any
-    e: PROVIDER_KEY_MAP,EnvConfig,load_dotenv_if_available,get_env_config,check_providers,check_providers_live
+    e: PROVIDER_KEY_MAP,PROVIDER_MODEL_PREFIX,EnvConfig,load_dotenv_if_available,get_env_config,check_providers,CONFIG_ALIASES,_SECRET_KEYS
     EnvConfig:   # Resolved environment configuration.
     load_dotenv_if_available(path:Any=None)->None
     get_env_config(dotenv_path:Any=None)->EnvConfig
     check_providers(env:Any=None)->dict[str, dict[str, Any]]
-    check_providers_live(env:Any=None)->dict[str, dict[str, Any]]
+    _resolve_config_path(global_:bool=False)->Path
+    _read_env_file(path:Path)->dict[str, str]
+    _write_env_file(path:Path;entries:dict[str;str];comments:Any=None)->None
+    resolve_alias(key:str)->str
+    mask_value(key:str;value:str)->str
   prellm/cli.py:
     i: asyncio,json,sys,typer,pathlib.Path,typing.Optional
-    e: query,run,process,analyze,decompose,init,serve,doctor
+    e: query,process,decompose,init,serve,doctor,config_set_cmd,config_get_cmd
     query(prompt:str=typer.Argument(...; help='The prompt/query to preprocess and execute');small:str=typer.Option('ollama/qwen2.5:3b'; '--small'; '-s'; help='Small LLM for preprocessing');large:str=typer.Option('gpt-4o-mini'; '--large'; '-l'; help='Large LLM for execution');strategy:str=typer.Option('classify'; '--strategy'; '-S'; help='Strategy: classify|structure|split|enrich|passthrough');context:Optional[str]=typer.Option(None; '--context'; '-C'; help="User context tag (e.g. 'gdansk_embedded_python')");config:Optional[Path]=typer.Option(None; '--config'; '-c'; help='Optional YAML config file');...+1)
-    run(query:str=typer.Argument(...; help='The prompt/query to process');config:Path=typer.Option('rules.yaml'; '--config'; '-c'; help='Path to YAML config');model:str=typer.Option('gpt-4o-mini'; '--model'; '-m'; help='LLM model to use');dry_run:bool=typer.Option(False; '--dry-run'; '-d'; help="Analyze only; don't call LLM");json_output:bool=typer.Option(False; '--json'; '-j'; help='Output as JSON'))
     process(config:Path=typer.Argument(...; help='Path to process chain YAML');guard_config:Path=typer.Option('rules.yaml'; '--guard-config'; '-g'; help='Path to guard YAML config');dry_run:bool=typer.Option(False; '--dry-run'; '-d'; help='Analyze steps without calling LLM');json_output:bool=typer.Option(False; '--json'; '-j'; help='Output as JSON');env:Optional[str]=typer.Option(None; '--env'; '-e'; help='Environment override (e.g.; production)'))
-    analyze(query:str=typer.Argument(...; help='Query to analyze for bias/ambiguity');config:Path=typer.Option('rules.yaml'; '--config'; '-c'; help='Path to YAML config'))
     decompose(query:str=typer.Argument(...; help='The prompt/query to decompose');config:Path=typer.Option('configs/prellm_config.yaml'; '--config'; '-c'; help='Path to preLLM v0.2 YAML config');strategy:str=typer.Option('classify'; '--strategy'; '-s'; help='Decomposition strategy: classify|structure|split|enrich|passthrough');json_output:bool=typer.Option(False; '--json'; '-j'; help='Output as JSON'))
     init(output:Path=typer.Option('rules.yaml'; '--output'; '-o'; help='Output path for config');devops:bool=typer.Option(False; '--devops'; help='Include DevOps-specific patterns');v2:bool=typer.Option(False; '--v2'; help='Generate preLLM v0.2 config instead of v0.1'))
     serve(host:str=typer.Option('0.0.0.0'; '--host'; '-H'; help='Bind host');port:int=typer.Option(8080; '--port'; '-p'; help='Bind port');small:Optional[str]=typer.Option(None; '--small'; '-s'; help='Override small LLM (default: from .env)');large:Optional[str]=typer.Option(None; '--large'; '-l'; help='Override large LLM (default: from .env)');strategy:Optional[str]=typer.Option(None; '--strategy'; '-S'; help='Override strategy (default: from .env)');config:Optional[Path]=typer.Option(None; '--config'; '-c'; help='YAML config file');...+1)
     doctor(env_file:Optional[Path]=typer.Option(None; '--env-file'; help='Path to .env file');live:bool=typer.Option(False; '--live'; help='Test live connectivity to providers'))
+    config_set_cmd(key:str=typer.Argument(...; help='Config key (e.g. openrouter-key; model; small-model; strategy)');value:str=typer.Argument(...; help='Value to set');global_:bool=typer.Option(False; '--global'; '-g'; help='Save to ~/.prellm/.env (user-wide) instead of project .env'))
+    config_get_cmd(key:str=typer.Argument(...; help='Config key (e.g. openrouter-key; model; small-model)');raw:bool=typer.Option(False; '--raw'; '-r'; help='Show unmasked value'))
   prellm/server.py:
     i: asyncio,json,logging,os,time,uuid,fastapi.{FastAPI,HTTPException},typing.{Any,AsyncGenerator}
     e: SMALL_MODEL,LARGE_MODEL,DEFAULT_STRATEGY,CONFIG_PATH,MASTER_KEY,ChatMessage,PreLLMExtras,ChatCompletionRequest
@@ -117,16 +163,16 @@ D:
     BiasPattern: 
   prellm/core.py:
     i: logging,datetime,yaml,pathlib.Path,prellm.analyzers.bias_detector.BiasDetector,prellm.analyzers.context_engine.ContextEngine,prellm.llm_provider.LLMProvider,prellm.models.{AuditEntry,BiasPattern},typing.Any
-    e: preprocess_and_execute,preprocess_and_execute_sync,preprocess_and_execute_v3,PreLLM,prellm
+    e: preprocess_and_execute,preprocess_and_execute_sync,PreLLM,prellm
     PreLLM: __init__(2),__call__(3),decompose_only(3),get_audit_log(0),_audit(3)  # preLLM v0.2/v0.3 — small LLM decompos...
     prellm: __init__(2),__call__(3),analyze_only(1),get_audit_log(0),_audit(4)  # v0.1 Prellm middleware — analyze, enr...
     preprocess_and_execute(query:str;small_llm:str='ollama/qwen2.5:3b';large_llm:str='anthropic/claude-sonnet-4-20250514';strategy:Any='classify';user_context:Any=None;config_path:Any=None;...+1)->PreLLMResponse
     preprocess_and_execute_sync(query:str;small_llm:str='ollama/qwen2.5:3b';large_llm:str='anthropic/claude-sonnet-4-20250514';strategy:Any='classify';user_context:Any=None;config_path:Any=None;...+1)->PreLLMResponse
-    preprocess_and_execute_v3(query:str;small_llm:str='ollama/qwen2.5:3b';large_llm:str='anthropic/claude-sonnet-4-20250514';pipeline:str='classify';user_context:Any=None;config_path:Any=None;...+1)->PreLLMResponse
+    _execute_v3_pipeline(query:str;small_llm:str;large_llm:str;pipeline:str;user_context:Any=None;prompts_path:Any=None;...+1)->PreLLMResponse
   prellm/llm_provider.py:
     i: json,logging,prellm.models.LLMProviderConfig,typing.Any
     e: LLMProvider
-    LLMProvider: __init__(1),complete(3),complete_json(2),_parse_json(1)  # Unified LLM caller with retry and fal...
+    LLMProvider: __init__(1),complete(3),complete_json(2),complete_structured(4),_parse_json(1)  # Unified LLM caller with retry and fal...
   prellm/pipeline.py:
     i: logging,yaml,pathlib.Path,prellm.llm_provider.LLMProvider,prellm.prompt_registry.PromptRegistry,pydantic.{BaseModel,Field},typing.{Any,Callable}
     e: _DEFAULT_PIPELINES_PATH,PipelineStep,PipelineConfig,StepExecutionResult,PipelineResult,PromptPipeline
@@ -217,6 +263,12 @@ D:
     i: pytest,prellm.analyzers.context_engine.ContextEngine
     e: TestContextEngine
     TestContextEngine: test_env_context(1),test_enrich_prompt(1),test_extra_overrides_env(1),test_missing_env_graceful(0),test_system_context(0)
+  tests/test_codebase_indexer.py:
+    i: pytest,pathlib.Path,prellm.context.codebase_indexer.{CodeSymbol,CodebaseIndex,CodebaseIndexer,FileIndex}
+    e: TestCodebaseIndexerRegex,TestCodeSymbolDataclass,TestCodebaseIndexerImport
+    TestCodebaseIndexerRegex: test_index_python_file(1),test_index_empty_directory(1),test_index_excludes_dirs(1),test_index_respects_language_filter(1),test_search_finds_symbols(1)  # Test regex-based fallback indexing (n...
+    TestCodeSymbolDataclass: test_code_symbol_defaults(0),test_file_index_defaults(0)
+    TestCodebaseIndexerImport: test_importable_from_context(0)
   tests/test_user_memory.py:
     i: pytest,pathlib.Path,prellm.context.user_memory.UserMemory
     e: memory,test_user_memory_add_interaction,test_user_memory_get_recent,test_user_memory_preferences,test_user_memory_preference_update,test_user_memory_sqlite_backend,test_user_memory_empty_history,test_user_memory_clear
@@ -228,6 +280,14 @@ D:
     test_user_memory_sqlite_backend(tmp_path:Path)
     test_user_memory_empty_history(memory:UserMemory)
     test_user_memory_clear(memory:UserMemory)
+  tests/test_structured_output.py:
+    i: pytest,prellm.llm_provider.LLMProvider,prellm.models.LLMProviderConfig,pydantic.{BaseModel,Field},unittest.mock.{AsyncMock,MagicMock,patch}
+    e: ClassificationResult,DeployParams,TestCompleteStructuredImportError,TestCompleteStructuredWithMock,TestCompleteStructuredMethod
+    ClassificationResult: 
+    DeployParams: 
+    TestCompleteStructuredImportError: test_raises_import_error_without_instructor(0)  # Test graceful handling when instructo...
+    TestCompleteStructuredWithMock: test_returns_validated_model(0),test_structured_with_system_prompt(0),test_structured_fallback_on_failure(0)  # Test structured output with mocked in...
+    TestCompleteStructuredMethod: test_method_exists(0),test_all_models_fail_raises_runtime_error(0)  # Test the actual method signature and...
   tests/test_v2_architecture.py:
     i: json,pytest,prellm.models.{ClassificationResult,DecompositionPrompts,DecompositionResult,DecompositionStrategy,DomainRule},unittest.mock.{AsyncMock,MagicMock,patch}
     e: TestLLMProvider,TestQueryDecomposer,TestDomainRule,TestPreLLMConfig,TestPreLLMCore,TestPreLLMConfigLoading,TestProcessChainV2,TestDecompositionResult
@@ -285,7 +345,7 @@ D:
     test_pipeline_conditional_step_skip(registry:PromptRegistry;mock_llm:LLMProvider)
     test_pipeline_conditional_step_executes(registry:PromptRegistry;mock_llm:LLMProvider)
   htmlcov/coverage_html_cb_dd2e7eb5.js:
-    e: on_click,checkVisible,debounce,sortColumn,getCellValue,rowComparator
+    e: on_click,rowComparator,debounce,checkVisible,getCellValue,sortColumn
     debounce(callback;wait)
     checkVisible(element)
     on_click(sel;fn)
@@ -295,11 +355,18 @@ D:
   prellm/chains/process_chain.py:
     i: logging,time,datetime,yaml,pathlib.Path,prellm.analyzers.context_engine.ContextEngine,typing.{Any,Awaitable,Callable,Union}
     e: ProcessChain
-    ProcessChain: __init__(5),execute(3),_execute_step(4),get_audit_log(0),_audit_step(3)  # Execute multi-step DevOps workflows w...
+    ProcessChain: __init__(5),execute(3),_execute_step(4),_check_dependencies(1),_handle_approval(4)  # Execute multi-step DevOps workflows w...
   prellm/context/user_memory.py:
     i: json,logging,sqlite3,time,pathlib.Path,typing.Any
-    e: _DEFAULT_DB_PATH,UserMemory
-    UserMemory: __init__(2),_init_sqlite(0),add_interaction(3),get_recent_context(2),get_user_preferences(0)  # Stores user query history and learned...
+    e: _DEFAULT_DB_PATH,_DEFAULT_CHROMA_PATH,_CHROMA_COLLECTION,UserMemory
+    UserMemory: __init__(2),_init_sqlite(0),_init_chromadb(0),add_interaction(3),get_recent_context(2)  # Stores user query history and learned...
+  prellm/context/codebase_indexer.py:
+    i: logging,dataclasses.{dataclass,field},pathlib.Path,typing.Any
+    e: CodeSymbol,FileIndex,CodebaseIndex,_LANG_MAP,CodebaseIndexer
+    CodeSymbol:   # A code symbol extracted from source.
+    FileIndex:   # Index of a single source file.
+    CodebaseIndex:   # Full codebase index.
+    CodebaseIndexer: __init__(1),_check_tree_sitter(0),index_directory(3),_index_file(2),_extract_with_tree_sitter(3)  # Index a codebase using tree-sitter fo...
   prellm/analyzers/bias_detector.py:
     i: re,prellm.models.{AnalysisResult,BiasPattern},typing.Any
     e: DEFAULT_PATTERNS,BiasDetector

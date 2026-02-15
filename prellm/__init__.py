@@ -11,12 +11,12 @@ Usage:
     print(result.content)
 """
 
-__version__ = "0.3.4"
+__version__ = "0.3.8"
 
-# 1-function API — the primary interface (unified v0.2 + v0.3)
+# 1-function API — the primary interface (always uses v0.3 pipeline internally)
 from prellm.core import preprocess_and_execute, preprocess_and_execute_sync
 
-# v0.3 backward-compatible alias (preprocess_and_execute now handles both paths)
+# Backward-compatible alias
 from prellm.core import preprocess_and_execute_v3
 from prellm.agents.preprocessor import PreprocessorAgent, PreprocessResult
 from prellm.agents.executor import ExecutorAgent, ExecutorResult
@@ -24,7 +24,7 @@ from prellm.pipeline import PromptPipeline, PipelineConfig, PipelineStep, Pipeli
 from prellm.prompt_registry import PromptRegistry
 from prellm.validators import ResponseValidator
 
-# v0.2 — class-based architecture
+# Class-based architecture
 from prellm.core import PreLLM
 from prellm.llm_provider import LLMProvider
 from prellm.query_decomposer import QueryDecomposer
@@ -37,34 +37,29 @@ from prellm.models import (
     PreLLMResponse,
 )
 
-# v0.1 — backward compatibility
-from prellm.core import prellm
-from prellm.models import GuardResponse, GuardConfig, AnalysisResult
+# Components
 from prellm.chains.process_chain import ProcessChain
-from prellm.analyzers.bias_detector import BiasDetector
 from prellm.analyzers.context_engine import ContextEngine
-
-# User memory
 from prellm.context.user_memory import UserMemory
 
 __all__ = [
-    # 1-function API (primary, unified v0.2 + v0.3)
+    # 1-function API (primary)
     "preprocess_and_execute",
     "preprocess_and_execute_sync",
-    # v0.3 backward-compatible alias
     "preprocess_and_execute_v3",
+    # Agents
     "PreprocessorAgent",
     "PreprocessResult",
     "ExecutorAgent",
     "ExecutorResult",
+    # Pipeline
     "PromptPipeline",
     "PipelineConfig",
     "PipelineStep",
     "PipelineResult",
     "PromptRegistry",
     "ResponseValidator",
-    "UserMemory",
-    # v0.2 class-based
+    # Class-based
     "PreLLM",
     "LLMProvider",
     "QueryDecomposer",
@@ -74,12 +69,8 @@ __all__ = [
     "LLMProviderConfig",
     "PreLLMConfig",
     "PreLLMResponse",
-    # v0.1 compat
-    "prellm",
+    # Components
     "ProcessChain",
-    "GuardResponse",
-    "GuardConfig",
-    "AnalysisResult",
-    "BiasDetector",
     "ContextEngine",
+    "UserMemory",
 ]

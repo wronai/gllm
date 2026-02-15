@@ -68,12 +68,12 @@ class ProcessChain:
         else:
             raise ValueError("Either config_path or config must be provided")
 
-        # v0.2 engine takes priority over v0.1 guard
+        # v0.2+ engine takes priority over guard
         self._engine = engine
         self._guard = guard
         if not engine and not guard:
-            from prellm.core import prellm
-            self._guard = prellm(config_path=guard_config_path)
+            from prellm.core import PreLLM
+            self._engine = PreLLM(config_path=guard_config_path)
 
         self.context_engine = ContextEngine(self.process_config.context_sources)
         self.audit_log: list[AuditEntry] = []

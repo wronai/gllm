@@ -146,74 +146,36 @@ def decompose(
 
 @app.command()
 def init(
-    output: Path = typer.Option("rules.yaml", "--output", "-o", help="Output path for config"),
-    devops: bool = typer.Option(False, "--devops", help="Include DevOps-specific patterns"),
-    v2: bool = typer.Option(False, "--v2", help="Generate preLLM v0.2 config instead of v0.1"),
+    output: Path = typer.Option("prellm_config.yaml", "--output", "-o", help="Output path for config"),
+    devops: bool = typer.Option(False, "--devops", help="Include DevOps-specific domain rules and context sources"),
 ):
-    """Generate a starter config file (v0.1 rules.yaml or v0.2 prellm_config.yaml)."""
+    """Generate a starter preLLM config file."""
     import yaml
 
-    if v2:
-        config = {
-            "small_model": {"model": "phi3:mini", "fallback": ["qwen2:1.5b"], "max_tokens": 512, "temperature": 0.0},
-            "large_model": {"model": "gpt-4o-mini", "fallback": ["llama3"], "max_tokens": 2048},
-            "default_strategy": "classify",
-            "policy": "devops" if devops else "strict",
-            "domain_rules": [
-                {"name": "production_deploy", "keywords": ["deploy", "push", "release"],
-                 "intent": "deploy", "required_fields": ["environment_details", "version"],
-                 "severity": "critical", "strategy": "structure"},
-                {"name": "database_operation", "keywords": ["delete", "drop", "migrate"],
-                 "intent": "database", "required_fields": ["target_database", "backup_confirmed"],
-                 "severity": "critical", "strategy": "structure"},
-            ] if devops else [],
-            "context_sources": [
-                {"env": ["CLUSTER", "NAMESPACE", "GIT_SHA", "ENV"]},
-                {"git": ["branch", "short_sha", "last_commit_msg"]},
-                {"system": ["hostname", "os"]},
-            ] if devops else [],
-        }
-        out = output if str(output) != "rules.yaml" else Path("prellm_config.yaml")
-    else:
-        config = {
-            "bias_patterns": [
-                {"regex": "(zawsze|always)\\s+\\w+", "action": "clarify", "severity": "medium",
-                 "description": "Absolute quantifier"},
-                {"regex": "(tylko|only|just)\\s+\\w+", "action": "clarify", "severity": "low",
-                 "description": "Exclusive quantifier"},
-            ],
-            "clarify_template": "[KONTEKST]: Podaj szczeg\u00f3\u0142y lub alternatywy dla: {query}",
-            "max_retries": 3,
-            "policy": "strict",
-            "models": {
-                "fallback": ["gpt-4o-mini", "llama3"],
-                "timeout": 30,
-                "max_tokens": 2048,
-            },
-        }
+    config = {
+        "small_model": {"model": "phi3:mini", "fallback": ["qwen2:1.5b"], "max_tokens": 512, "temperature": 0.0},
+        "large_model": {"model": "gpt-4o-mini", "fallback": ["llama3"], "max_tokens": 2048},
+        "default_strategy": "classify",
+        "policy": "devops" if devops else "strict",
+        "domain_rules": [
+            {"name": "production_deploy", "keywords": ["deploy", "push", "release"],
+             "intent": "deploy", "required_fields": ["environment_details", "version"],
+             "severity": "critical", "strategy": "structure"},
+            {"name": "database_operation", "keywords": ["delete", "drop", "migrate"],
+             "intent": "database", "required_fields": ["target_database", "backup_confirmed"],
+             "severity": "critical", "strategy": "structure"},
+        ] if devops else [],
+        "context_sources": [
+            {"env": ["CLUSTER", "NAMESPACE", "GIT_SHA", "ENV"]},
+            {"git": ["branch", "short_sha", "last_commit_msg"]},
+            {"system": ["hostname", "os"]},
+        ] if devops else [],
+    }
 
-        if devops:
-            config["bias_patterns"].extend([
-                {"regex": "(deploy|zdeployuj)\\s+(na|to)\\s+(prod|production)", "action": "clarify",
-                 "severity": "critical", "description": "Production deployment without context"},
-                {"regex": "(delete|drop|remove|usu\u0144)\\s+(database|db|baz)", "action": "clarify",
-                 "severity": "critical", "description": "Destructive DB operation"},
-                {"regex": "(restart|reboot|kill)\\s+(server|service|pod)", "action": "clarify",
-                 "severity": "high", "description": "Service disruption"},
-                {"regex": "(scale|skaluj)\\s+(down|up|to\\s+\\d+)", "action": "clarify",
-                 "severity": "high", "description": "Scaling operation"},
-            ])
-            config["context_sources"] = [
-                {"env": ["CLUSTER", "NAMESPACE", "GIT_SHA", "ENV"]},
-                {"git": ["branch", "short_sha", "last_commit_msg"]},
-                {"system": ["hostname", "os"]},
-            ]
-        out = output
-
-    with open(out, "w") as f:
+    with open(output, "w") as f:
         yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
-    typer.echo(f"\u2705 Config written to {out}")
+    typer.echo(f"\u2705 Config written to {output}")
 
 
 @app.command()
@@ -273,6 +235,66 @@ def serve(
     )
 
 
+def _doctor_check_config(env) -> list[str]:
+    """Format configuration summary lines."""
+    lines = [
+        f"   Small LLM:  {env.small_model}",
+        f"   Large LLM:  {env.large_model}",
+        f"   Strategy:   {env.strategy}",
+        f"   Server:     {env.host}:{env.port}",
+        f"   Auth:       {'ON' if env.master_key else 'OFF (no LITELLM_MASTER_KEY)'}",
+    ]
+    if env.config_path:
+        lines.append(f"   Config:     {env.config_path}")
+    if env.fallbacks:
+        lines.append(f"   Fallbacks:  {', '.join(env.fallbacks)}")
+    if env.monthly_budget:
+        lines.append(f"   Budget:     ${env.monthly_budget:.2f}/month")
+    return lines
+
+
+def _doctor_check_providers(env, live: bool = False) -> list[str]:
+    """Check providers and return formatted lines."""
+    from prellm.env_config import check_providers
+
+    if live:
+        import asyncio
+        from prellm.env_config import check_providers_live
+        results = asyncio.run(check_providers_live(env))
+    else:
+        results = check_providers(env)
+
+    lines = []
+    for name, info in results.items():
+        status = info["status"]
+        icon = "\u2713" if status in ("ok", "configured") else ("\u2717" if status == "no_key" else "!")
+        lines.append(f"   {icon} {name.upper():12s} {info['detail']}")
+        if "models" in info:
+            lines.append(f"     Models: {', '.join(info['models'][:5])}")
+    return lines
+
+
+def _doctor_check_files(env_file: Path | None) -> list[str]:
+    """Check config files and return formatted lines."""
+    lines = []
+    env_path = Path(str(env_file)) if env_file else Path(".env")
+    if env_path.is_file():
+        lines.append(f"   \u2713 {env_path} (loaded)")
+    else:
+        lines.append(f"   \u2717 {env_path} (not found \u2014 run: cp .env.example .env)")
+
+    example_path = Path(".env.example")
+    if example_path.is_file():
+        lines.append(f"   \u2713 .env.example (available)")
+    else:
+        lines.append(f"   \u2717 .env.example (not found)")
+
+    config_yaml = Path("configs/prellm_config.yaml")
+    if config_yaml.is_file():
+        lines.append(f"   \u2713 {config_yaml}")
+    return lines
+
+
 @app.command()
 def doctor(
     env_file: Optional[Path] = typer.Option(None, "--env-file", help="Path to .env file"),
@@ -286,69 +308,24 @@ def doctor(
         prellm doctor
         prellm doctor --live
     """
-    from prellm.env_config import get_env_config, check_providers
+    from prellm.env_config import get_env_config
 
     env = get_env_config(str(env_file) if env_file else None)
 
     typer.echo(f"\n\U0001f9e0 preLLM Doctor")
     typer.echo(f"{'='*60}")
 
-    # Config
     typer.echo(f"\n\U0001f4cb Configuration:")
-    typer.echo(f"   Small LLM:  {env.small_model}")
-    typer.echo(f"   Large LLM:  {env.large_model}")
-    typer.echo(f"   Strategy:   {env.strategy}")
-    typer.echo(f"   Server:     {env.host}:{env.port}")
-    typer.echo(f"   Auth:       {'ON' if env.master_key else 'OFF (no LITELLM_MASTER_KEY)'}")
-    if env.config_path:
-        typer.echo(f"   Config:     {env.config_path}")
-    if env.fallbacks:
-        typer.echo(f"   Fallbacks:  {', '.join(env.fallbacks)}")
-    if env.monthly_budget:
-        typer.echo(f"   Budget:     ${env.monthly_budget:.2f}/month")
+    for line in _doctor_check_config(env):
+        typer.echo(line)
 
-    # Providers
     typer.echo(f"\n\U0001f50c Providers:")
+    for line in _doctor_check_providers(env, live=live):
+        typer.echo(line)
 
-    if live:
-        import asyncio
-        from prellm.env_config import check_providers_live
-        results = asyncio.run(check_providers_live(env))
-    else:
-        results = check_providers(env)
-
-    for name, info in results.items():
-        status = info["status"]
-        if status in ("ok", "configured"):
-            icon = "\u2713"
-            color = ""
-        elif status == "no_key":
-            icon = "\u2717"
-            color = ""
-        else:
-            icon = "!"
-            color = ""
-        typer.echo(f"   {icon} {name.upper():12s} {info['detail']}")
-        if "models" in info:
-            typer.echo(f"     Models: {', '.join(info['models'][:5])}")
-
-    # .env file check
     typer.echo(f"\n\U0001f4c4 Files:")
-    env_path = Path(str(env_file)) if env_file else Path(".env")
-    if env_path.is_file():
-        typer.echo(f"   \u2713 {env_path} (loaded)")
-    else:
-        typer.echo(f"   \u2717 {env_path} (not found \u2014 run: cp .env.example .env)")
-
-    example_path = Path(".env.example")
-    if example_path.is_file():
-        typer.echo(f"   \u2713 .env.example (available)")
-    else:
-        typer.echo(f"   \u2717 .env.example (not found)")
-
-    config_yaml = Path("configs/prellm_config.yaml")
-    if config_yaml.is_file():
-        typer.echo(f"   \u2713 {config_yaml}")
+    for line in _doctor_check_files(env_file):
+        typer.echo(line)
 
     typer.echo(f"\n{'='*60}")
     typer.echo(f"\u2705 Doctor complete. Use --live to test connectivity.\n")
@@ -415,6 +392,28 @@ def config_get_cmd(
     typer.echo(f"   Source: {source}")
 
 
+def _format_config_sections(entries: dict) -> dict[str, list[str]]:
+    """Group config entries into categorized sections for display."""
+    sections: dict[str, list[str]] = {
+        "\U0001f511 API Keys": [],
+        "\U0001f916 Models": [],
+        "\u2699\ufe0f  Settings": [],
+        "\U0001f4cb Other": [],
+    }
+    for var, info in entries.items():
+        alias = f" ({info['alias']})" if info["alias"] else ""
+        line = f"   {var}{alias} = {info['value']}  [{info['source']}]"
+        if "API_KEY" in var or "SECRET" in var or var == "LITELLM_MASTER_KEY":
+            sections["\U0001f511 API Keys"].append(line)
+        elif "MODEL" in var or "DEFAULT" in var:
+            sections["\U0001f916 Models"].append(line)
+        elif var.startswith("PRELLM_"):
+            sections["\u2699\ufe0f  Settings"].append(line)
+        else:
+            sections["\U0001f4cb Other"].append(line)
+    return sections
+
+
 @config_app.command("list")
 def config_list_cmd(
     raw: bool = typer.Option(False, "--raw", "-r", help="Show unmasked secret values"),
@@ -437,40 +436,11 @@ def config_list_cmd(
     typer.echo(f"\n\U0001f9e0 preLLM Configuration")
     typer.echo(f"{'='*60}")
 
-    # Group by category
-    keys_section = []
-    models_section = []
-    settings_section = []
-    other_section = []
-
-    for var, info in entries.items():
-        alias = f" ({info['alias']})" if info["alias"] else ""
-        line = f"   {var}{alias} = {info['value']}  [{info['source']}]"
-        if "API_KEY" in var or "SECRET" in var or var == "LITELLM_MASTER_KEY":
-            keys_section.append(line)
-        elif "MODEL" in var or "DEFAULT" in var:
-            models_section.append(line)
-        elif var.startswith("PRELLM_"):
-            settings_section.append(line)
-        else:
-            other_section.append(line)
-
-    if keys_section:
-        typer.echo(f"\n\U0001f511 API Keys:")
-        for line in keys_section:
-            typer.echo(line)
-    if models_section:
-        typer.echo(f"\n\U0001f916 Models:")
-        for line in models_section:
-            typer.echo(line)
-    if settings_section:
-        typer.echo(f"\n\u2699\ufe0f  Settings:")
-        for line in settings_section:
-            typer.echo(line)
-    if other_section:
-        typer.echo(f"\n\U0001f4cb Other:")
-        for line in other_section:
-            typer.echo(line)
+    for title, lines in _format_config_sections(entries).items():
+        if lines:
+            typer.echo(f"\n{title}:")
+            for line in lines:
+                typer.echo(line)
 
     typer.echo(f"\n{'='*60}")
 
@@ -603,46 +573,10 @@ def models(
         prellm models --provider openrouter
         prellm models --search kimi
     """
-    # Curated list of popular model pairs
-    pairs = [
-        # (name, small_llm, large_llm, cost_hint)
-        ("Ollama local (free)", "ollama/qwen2.5:3b", "ollama/llama3:8b", "$0.00"),
-        ("Ollama + OpenAI", "ollama/qwen2.5:3b", "gpt-4o-mini", "~$0.15"),
-        ("Ollama + Claude", "ollama/qwen2.5:3b", "anthropic/claude-sonnet-4-20250514", "~$0.30"),
-        ("Ollama + Kimi K2.5", "ollama/qwen2.5:3b", "openrouter/moonshotai/kimi-k2.5", "~$0.10"),
-        ("OpenAI only", "gpt-4o-mini", "gpt-4o", "~$0.20"),
-        ("Anthropic only", "anthropic/claude-haiku", "anthropic/claude-sonnet-4-20250514", "~$0.35"),
-        ("Groq fast", "groq/llama-3.1-8b-instant", "groq/llama-3.3-70b-versatile", "~$0.05"),
-        ("Mistral", "mistral/mistral-small-latest", "mistral/mistral-large-latest", "~$0.20"),
-        ("DeepSeek", "deepseek/deepseek-chat", "deepseek/deepseek-reasoner", "~$0.15"),
-        ("Google Gemini", "gemini/gemini-2.0-flash", "gemini/gemini-2.5-pro-preview-06-05", "~$0.20"),
-        ("Together AI", "together_ai/Qwen/Qwen2.5-7B-Instruct-Turbo", "together_ai/meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", "~$0.10"),
-        ("Azure OpenAI", "azure/gpt-4o-mini-deployment", "azure/gpt-4o-deployment", "~$0.20"),
-        ("AWS Bedrock", "bedrock/anthropic.claude-3-haiku-20240307-v1:0", "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0", "~$0.30"),
-    ]
+    from prellm.model_catalog import list_model_pairs, list_openrouter_models
 
-    # OpenRouter popular models
-    openrouter_models = [
-        ("openrouter/moonshotai/kimi-k2.5", "Moonshot Kimi K2.5 — strong reasoning, competitive pricing"),
-        ("openrouter/google/gemini-2.5-pro-preview-06-05", "Google Gemini 2.5 Pro"),
-        ("openrouter/anthropic/claude-sonnet-4-20250514", "Claude Sonnet 4"),
-        ("openrouter/openai/gpt-4o", "OpenAI GPT-4o"),
-        ("openrouter/meta-llama/llama-3.3-70b-instruct", "Meta Llama 3.3 70B"),
-        ("openrouter/deepseek/deepseek-r1", "DeepSeek R1 reasoning"),
-        ("openrouter/qwen/qwen-2.5-72b-instruct", "Qwen 2.5 72B"),
-        ("openrouter/mistralai/mistral-large-2411", "Mistral Large"),
-    ]
-
-    # Filter
-    if provider:
-        provider_lower = provider.lower()
-        pairs = [p for p in pairs if provider_lower in p[0].lower() or provider_lower in p[1].lower() or provider_lower in p[2].lower()]
-        openrouter_models = [m for m in openrouter_models if provider_lower in m[0].lower() or provider_lower in m[1].lower()]
-
-    if search:
-        search_lower = search.lower()
-        pairs = [p for p in pairs if search_lower in p[0].lower() or search_lower in p[1].lower() or search_lower in p[2].lower()]
-        openrouter_models = [m for m in openrouter_models if search_lower in m[0].lower() or search_lower in m[1].lower()]
+    pairs = list_model_pairs(provider=provider, search=search)
+    or_models = list_openrouter_models(provider=provider, search=search)
 
     typer.echo(f"\n\U0001f916 preLLM Model Pairs")
     typer.echo(f"{'='*60}")
@@ -650,14 +584,14 @@ def models(
     if pairs:
         typer.echo(f"\n{'Name':<25s} {'Small LLM':<30s} {'Large LLM':<45s} {'Cost':>6s}")
         typer.echo(f"{'-'*25} {'-'*30} {'-'*45} {'-'*6}")
-        for name, small, large, cost in pairs:
-            typer.echo(f"{name:<25s} {small:<30s} {large:<45s} {cost:>6s}")
+        for m in pairs:
+            typer.echo(f"{m['name']:<25s} {m['small']:<30s} {m['large']:<45s} {m['cost']:>6s}")
 
-    if openrouter_models:
+    if or_models:
         typer.echo(f"\n\U0001f310 OpenRouter Models (use with --large):")
-        for model_id, desc in openrouter_models:
-            typer.echo(f"   {model_id}")
-            typer.echo(f"      {desc}")
+        for m in or_models:
+            typer.echo(f"   {m['model_id']}")
+            typer.echo(f"      {m['description']}")
 
     typer.echo(f"\n\U0001f4a1 Usage:")
     typer.echo(f'   prellm "Deploy app" --large openrouter/moonshotai/kimi-k2.5')

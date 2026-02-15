@@ -11,10 +11,8 @@ import pytest
 import yaml
 
 from prellm.chains.process_chain import ProcessChain
-from prellm.core import prellm
 from prellm.models import (
     ApprovalMode,
-    GuardConfig,
     Policy,
     ProcessConfig,
     ProcessStep,
@@ -181,8 +179,7 @@ class TestProcessChainDryRun:
             context_sources=[{"env": ["CLUSTER"]}],
             steps=[ProcessStep(name="check", prompt="Check {CLUSTER}", approval=ApprovalMode.AUTO)],
         )
-        guard = prellm(config=GuardConfig(bias_patterns=[]))
-        chain = ProcessChain(config=config, guard=guard)
+        chain = ProcessChain(config=config)
         result = await chain.execute(dry_run=True)
         assert result.completed is True
 
@@ -228,10 +225,7 @@ class TestDeployConfig:
     def test_deploy_yaml_loads(self):
         deploy_path = Path(__file__).parent.parent / "configs" / "deploy.yaml"
         if deploy_path.exists():
-            chain = ProcessChain(
-                config_path=deploy_path,
-                guard=prellm(config=GuardConfig(bias_patterns=[])),
-            )
+            chain = ProcessChain(config_path=deploy_path)
             assert chain.process_config.process == "deploy-production"
             assert len(chain.process_config.steps) == 5
             assert chain.process_config.steps[1].approval == ApprovalMode.MANUAL

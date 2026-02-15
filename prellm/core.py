@@ -25,19 +25,15 @@ from typing import Any
 
 import yaml
 
-from prellm.analyzers.bias_detector import BiasDetector
 from prellm.analyzers.context_engine import ContextEngine
 from prellm.llm_provider import LLMProvider
 from prellm.models import (
     AuditEntry,
-    BiasPattern,
     DecompositionPrompts,
+    DecompositionResult,
     DecompositionStrategy,
     DomainRule,
-    GuardConfig,
-    GuardResponse,
     LLMProviderConfig,
-    ModelConfig,
     Policy,
     PreLLMConfig,
     PreLLMResponse,
@@ -72,9 +68,9 @@ async def preprocess_and_execute(
 ) -> PreLLMResponse:
     """One function to preprocess and execute — like litellm.completion() but with small LLM decomposition.
 
-    Supports two execution paths:
-      - v0.2 (default): strategy-based via PreLLM class (classify, structure, split, enrich, passthrough)
-      - v0.3 (pipeline=...): two-agent via PreprocessorAgent + ExecutorAgent + PromptPipeline
+    Always uses the v0.3 two-agent pipeline internally. The `strategy` parameter maps
+    directly to a pipeline name (classify, structure, split, enrich, passthrough).
+    The `pipeline` parameter overrides `strategy` for custom pipelines (e.g. "dual_agent_full").
 
     Args:
         query: The raw user query / prompt.
@@ -84,81 +80,54 @@ async def preprocess_and_execute(
         user_context: Extra context as a string tag (e.g. "gdansk_embedded_python") or dict.
         config_path: Optional YAML config file for domain rules, prompts, etc.
         domain_rules: Optional inline domain rules as list of dicts.
-        pipeline: Pipeline name from pipelines.yaml (e.g. "dual_agent_full"). When set, uses v0.3 two-agent path.
-        prompts_path: Path to prompts.yaml (v0.3 only).
-        pipelines_path: Path to pipelines.yaml (v0.3 only).
-        schemas_path: Path to response_schemas.yaml (v0.3 only).
+        pipeline: Pipeline name from pipelines.yaml (e.g. "dual_agent_full"). Overrides strategy.
+        prompts_path: Path to prompts.yaml.
+        pipelines_path: Path to pipelines.yaml.
+        schemas_path: Path to response_schemas.yaml.
         **kwargs: Extra kwargs passed to the large LLM call (max_tokens, temperature, etc.).
 
     Returns:
         PreLLMResponse with content, decomposition details, model info.
 
     Usage:
-        # v0.2 — strategy-based (default)
+        # Strategy-based (maps to pipeline name)
         result = await preprocess_and_execute("Deploy app", strategy="structure")
 
-        # v0.3 — two-agent pipeline
+        # Explicit pipeline name
         result = await preprocess_and_execute("Deploy app", pipeline="dual_agent_full")
 
     Zero-config:
         result = await preprocess_and_execute("Refaktoryzuj kod")
     """
-    # v0.3 two-agent path — when pipeline is explicitly specified
-    if pipeline is not None:
-        return await _execute_v3_pipeline(
-            query=query,
-            small_llm=small_llm,
-            large_llm=large_llm,
-            pipeline=pipeline,
-            user_context=user_context,
-            prompts_path=prompts_path,
-            pipelines_path=pipelines_path,
-            schemas_path=schemas_path,
-            **kwargs,
-        )
+    # Resolve pipeline name: pipeline param overrides strategy
+    pipeline_name = pipeline or (strategy.value if isinstance(strategy, DecompositionStrategy) else strategy)
 
-    # v0.2 strategy-based path (default)
-    # Resolve strategy
-    if isinstance(strategy, str):
-        strat = DecompositionStrategy(strategy)
-    else:
-        strat = strategy
-
-    # Build config — from file or inline
+    # Load config overrides from YAML if provided
+    config_overrides: dict[str, Any] = {}
     if config_path:
         config = PreLLM._load_config(Path(config_path))
-        # Override models if explicitly provided (non-default)
-        if small_llm != "ollama/qwen2.5:3b":
-            config.small_model = LLMProviderConfig(model=small_llm, max_tokens=512, temperature=0.0)
-        if large_llm != "anthropic/claude-sonnet-4-20250514":
-            config.large_model = LLMProviderConfig(model=large_llm, max_tokens=kwargs.pop("max_tokens", 2048))
-    else:
-        # Extract LLM-specific kwargs
-        max_tokens = kwargs.pop("max_tokens", 2048)
-        temperature = kwargs.pop("temperature", 0.7)
+        # Use config models unless explicitly overridden
+        if small_llm == "ollama/qwen2.5:3b":
+            small_llm = config.small_model.model
+        if large_llm == "anthropic/claude-sonnet-4-20250514":
+            large_llm = config.large_model.model
+            kwargs.setdefault("max_tokens", config.large_model.max_tokens)
+        # Inject domain rules from config
+        if config.domain_rules and not domain_rules:
+            domain_rules = [r.model_dump() for r in config.domain_rules]
 
-        rules = []
-        if domain_rules:
-            for r in domain_rules:
-                rules.append(DomainRule(**r) if isinstance(r, dict) else r)
-
-        config = PreLLMConfig(
-            small_model=LLMProviderConfig(model=small_llm, max_tokens=512, temperature=0.0),
-            large_model=LLMProviderConfig(model=large_llm, max_tokens=max_tokens, temperature=temperature),
-            default_strategy=strat,
-            domain_rules=rules,
-        )
-
-    # Build context
-    extra_context: dict[str, str] | None = None
-    if isinstance(user_context, str) and user_context:
-        extra_context = {"user_context": user_context}
-    elif isinstance(user_context, dict):
-        extra_context = user_context
-
-    # Execute
-    engine = PreLLM(config=config)
-    return await engine(query, strategy=strat, extra_context=extra_context, **kwargs)
+    return await _execute_v3_pipeline(
+        query=query,
+        small_llm=small_llm,
+        large_llm=large_llm,
+        pipeline=pipeline_name,
+        user_context=user_context,
+        domain_rules=domain_rules,
+        prompts_path=prompts_path,
+        pipelines_path=pipelines_path,
+        schemas_path=schemas_path,
+        **kwargs,
+    )
 
 
 # Sync wrapper for non-async code
@@ -209,6 +178,7 @@ async def _execute_v3_pipeline(
     large_llm: str,
     pipeline: str,
     user_context: str | dict[str, str] | None = None,
+    domain_rules: list[dict[str, Any]] | None = None,
     prompts_path: str | Path | None = None,
     pipelines_path: str | Path | None = None,
     schemas_path: str | Path | None = None,
@@ -235,11 +205,15 @@ async def _execute_v3_pipeline(
     )
 
     # Build context
-    extra_context: dict[str, str] | None = None
+    extra_context: dict[str, Any] = {}
     if isinstance(user_context, str) and user_context:
-        extra_context = {"user_context": user_context}
+        extra_context["user_context"] = user_context
     elif isinstance(user_context, dict):
-        extra_context = user_context
+        extra_context.update(user_context)
+
+    # Inject domain rules into context for pipeline algo steps
+    if domain_rules:
+        extra_context["domain_rules"] = domain_rules
 
     # Build agents
     preprocessor = PreprocessorAgent(
@@ -256,7 +230,7 @@ async def _execute_v3_pipeline(
     # 1. Preprocess
     prep_result = await preprocessor.preprocess(
         query=query,
-        user_context=extra_context,
+        user_context=extra_context or None,
         pipeline_name=pipeline,
     )
 
@@ -266,25 +240,80 @@ async def _execute_v3_pipeline(
         **kwargs,
     )
 
-    # 3. Build response (backward-compatible PreLLMResponse)
-    decomposition_result = None
-    if prep_result.decomposition:
-        from prellm.models import DecompositionResult
-        decomposition_result = DecompositionResult(
-            strategy=DecompositionStrategy(pipeline) if pipeline in [s.value for s in DecompositionStrategy] else DecompositionStrategy.CLASSIFY,
-            original_query=query,
-            composed_prompt=prep_result.executor_input,
-        )
+    # 3. Build backward-compatible DecompositionResult from pipeline state
+    decomposition_result = _build_decomposition_result(query, pipeline, prep_result)
 
     return PreLLMResponse(
-        content=exec_result.content,
+        content=exec_result.content or "No response from any model.",
         decomposition=decomposition_result,
         model_used=exec_result.model_used,
         small_model_used=small_llm,
         retries=exec_result.retries,
-        clarified=False,
-        needs_more_context=False,
+        clarified=bool(decomposition_result and decomposition_result.missing_fields),
+        needs_more_context=bool(decomposition_result and decomposition_result.missing_fields) and not exec_result.content,
     )
+
+
+def _build_decomposition_result(
+    query: str,
+    pipeline_name: str,
+    prep_result: Any,
+) -> DecompositionResult | None:
+    """Build a backward-compatible DecompositionResult from pipeline state."""
+    from prellm.models import ClassificationResult, StructureResult
+
+    if not prep_result.decomposition:
+        return None
+
+    state = prep_result.decomposition.state
+    strategy_values = [s.value for s in DecompositionStrategy]
+    strategy = DecompositionStrategy(pipeline_name) if pipeline_name in strategy_values else DecompositionStrategy.CLASSIFY
+
+    result = DecompositionResult(
+        strategy=strategy,
+        original_query=query,
+        composed_prompt=prep_result.executor_input,
+    )
+
+    # Extract classification from pipeline state
+    classification = state.get("classification")
+    if isinstance(classification, dict):
+        result.classification = ClassificationResult(
+            intent=classification.get("intent", "unknown"),
+            confidence=float(classification.get("confidence", 0.0)),
+            domain=classification.get("domain", "general"),
+        )
+
+    # Extract structure from pipeline state
+    fields = state.get("fields")
+    if isinstance(fields, dict):
+        result.structure = StructureResult(
+            action=fields.get("action", ""),
+            target=fields.get("target", ""),
+            parameters=fields.get("parameters", {}),
+        )
+
+    # Extract sub_queries from pipeline state
+    sub_queries = state.get("sub_queries")
+    if isinstance(sub_queries, dict) and "sub_queries" in sub_queries:
+        result.sub_queries = [str(q) for q in sub_queries["sub_queries"]]
+    elif isinstance(sub_queries, list):
+        result.sub_queries = [str(q) for q in sub_queries]
+
+    # Extract missing_fields from pipeline state
+    missing_fields = state.get("missing_fields")
+    if isinstance(missing_fields, list):
+        result.missing_fields = missing_fields
+
+    # Extract matched_rule from pipeline state
+    matched_rule = state.get("matched_rule")
+    if isinstance(matched_rule, dict) and "name" in matched_rule:
+        result.matched_rule = matched_rule["name"]
+        # Also extract missing fields from rule matching
+        if not result.missing_fields and matched_rule.get("required_fields"):
+            result.missing_fields = matched_rule["required_fields"]
+
+    return result
 
 
 # Backward-compatible alias
@@ -484,164 +513,4 @@ class PreLLM:
             context_sources=raw.get("context_sources", []),
             max_retries=raw.get("max_retries", 3),
             policy=Policy(raw.get("policy", "strict")),
-        )
-
-
-# ============================================================
-# v0.1 compat — prellm (DEPRECATED, kept for backward compatibility)
-# ============================================================
-
-class prellm:
-    """v0.1 Prellm middleware — analyze, enrich, and proxy LLM calls.
-
-    .. deprecated:: 0.3.2
-        Use ``preprocess_and_execute()`` or ``PreLLM`` instead.
-        This class will be removed in v0.5.
-
-    Usage:
-        guard = prellm("rules.yaml")
-        result = await guard("Zdeployuj na produkcję", model="gpt-4o-mini")
-    """
-
-    def __init__(
-        self,
-        config_path: str | Path | None = None,
-        config: GuardConfig | None = None,
-    ):
-        import warnings
-        warnings.warn(
-            "prellm class is deprecated since v0.3.2. Use preprocess_and_execute() or PreLLM instead. "
-            "Will be removed in v0.5.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        if config:
-            self.config = config
-        elif config_path:
-            self.config = self._load_config(Path(config_path))
-        else:
-            self.config = GuardConfig()
-
-        self.detector = BiasDetector(self.config.bias_patterns or None)
-        self.context_engine = ContextEngine(self.config.context_sources)
-        self.audit_log: list[AuditEntry] = []
-
-    async def __call__(
-        self,
-        query: str,
-        model: str | None = None,
-        extra_context: dict[str, str] | None = None,
-        **kwargs: Any,
-    ) -> GuardResponse:
-        """Analyze query, enrich if needed, call LLM, validate response."""
-        import litellm
-
-        target_model = model or self.config.models.fallback[0]
-
-        # Step 1: Analyze
-        analysis = self.detector.analyze(query)
-        analysis.original_query = query
-
-        # Step 2: Enrich if needed
-        if analysis.needs_clarify:
-            enriched = self.config.clarify_template.format(query=query)
-            enriched = self.context_engine.enrich_prompt(enriched, extra_context)
-            analysis.enriched_query = enriched
-        else:
-            enriched = self.context_engine.enrich_prompt(query, extra_context)
-            analysis.enriched_query = enriched
-
-        # Step 3: Call LLM with retry/fallback
-        response_content = ""
-        model_used = target_model
-        retries = 0
-
-        fallback_models = [target_model] + [
-            m for m in self.config.models.fallback if m != target_model
-        ]
-
-        for attempt_model in fallback_models:
-            for attempt in range(self.config.max_retries):
-                try:
-                    resp = await litellm.acompletion(
-                        model=attempt_model,
-                        messages=[{"role": "user", "content": enriched}],
-                        max_tokens=self.config.models.max_tokens,
-                        timeout=self.config.models.timeout,
-                        **kwargs,
-                    )
-                    response_content = resp.choices[0].message.content
-                    model_used = attempt_model
-                    break
-                except Exception as e:
-                    retries += 1
-                    logger.warning(f"Attempt {attempt + 1} with {attempt_model} failed: {e}")
-            if response_content:
-                break
-
-        # Step 4: Build response
-        result = GuardResponse(
-            content=response_content or "No response from any model.",
-            clarified=analysis.needs_clarify,
-            needs_more_context=analysis.needs_clarify and not response_content,
-            model_used=model_used,
-            analysis=analysis,
-            retries=retries,
-        )
-
-        # Audit
-        self._audit("query", query, result, model_used)
-
-        return result
-
-    def analyze_only(self, query: str) -> dict[str, Any]:
-        """Run analysis without calling LLM — useful for dry-run / testing."""
-        analysis = self.detector.analyze(query)
-        return {
-            "needs_clarify": analysis.needs_clarify,
-            "patterns": analysis.detected_patterns,
-            "ambiguity_flags": analysis.ambiguity_flags,
-            "readability": analysis.readability_score,
-            "enriched": self.config.clarify_template.format(query=query)
-            if analysis.needs_clarify
-            else query,
-        }
-
-    def get_audit_log(self) -> list[dict[str, Any]]:
-        """Return audit log as list of dicts."""
-        return [entry.model_dump() for entry in self.audit_log]
-
-    def _audit(self, action: str, query: str, response: GuardResponse, model: str) -> None:
-        entry = AuditEntry(
-            action=action,
-            query=query,
-            response_summary=response.content[:200] if response.content else "",
-            model=model,
-            policy=self.config.policy,
-        )
-        self.audit_log.append(entry)
-
-    @staticmethod
-    def _load_config(path: Path) -> GuardConfig:
-        """Load config from YAML file."""
-        with open(path) as f:
-            raw = yaml.safe_load(f) or {}
-
-        # Normalize bias_patterns
-        patterns = []
-        for p in raw.get("bias_patterns", []):
-            if isinstance(p, dict):
-                patterns.append(BiasPattern(**p))
-
-        models_raw = raw.get("models", {})
-        models = ModelConfig(**models_raw) if isinstance(models_raw, dict) else ModelConfig()
-
-        return GuardConfig(
-            bias_patterns=patterns,
-            clarify_template=raw.get("clarify_template", GuardConfig.model_fields["clarify_template"].default),
-            max_retries=raw.get("max_retries", 3),
-            policy=Policy(raw.get("policy", "strict")),
-            models=models,
-            context_sources=raw.get("context_sources", []),
         )
