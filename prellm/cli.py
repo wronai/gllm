@@ -354,5 +354,317 @@ def doctor(
     typer.echo(f"\u2705 Doctor complete. Use --live to test connectivity.\n")
 
 
+# ============================================================
+# Config management
+# ============================================================
+
+config_app = typer.Typer(
+    name="config",
+    help="Manage preLLM configuration — API keys, models, defaults.",
+    no_args_is_help=True,
+)
+app.add_typer(config_app, name="config")
+
+
+@config_app.command("set")
+def config_set_cmd(
+    key: str = typer.Argument(..., help="Config key (e.g. openrouter-key, model, small-model, strategy)"),
+    value: str = typer.Argument(..., help="Value to set"),
+    global_: bool = typer.Option(False, "--global", "-g", help="Save to ~/.prellm/.env (user-wide) instead of project .env"),
+):
+    """Set a config value persistently.
+
+    Saves to .env (project) or ~/.prellm/.env (--global).
+
+    Examples:
+        prellm config set openrouter-key sk-or-v1-abc123
+        prellm config set model openrouter/moonshotai/kimi-k2.5
+        prellm config set small-model ollama/qwen2.5:3b
+        prellm config set strategy structure
+        prellm config set openrouter-key sk-or-v1-abc123 --global
+    """
+    from prellm.env_config import config_set, mask_value, resolve_alias
+
+    env_var, path = config_set(key, value, global_=global_)
+    masked = mask_value(env_var, value)
+    typer.echo(f"\u2705 {env_var}={masked}")
+    typer.echo(f"   Saved to: {path}")
+
+
+@config_app.command("get")
+def config_get_cmd(
+    key: str = typer.Argument(..., help="Config key (e.g. openrouter-key, model, small-model)"),
+    raw: bool = typer.Option(False, "--raw", "-r", help="Show unmasked value"),
+):
+    """Get a config value.
+
+    Examples:
+        prellm config get openrouter-key
+        prellm config get model
+        prellm config get small-model
+    """
+    from prellm.env_config import config_get, mask_value
+
+    env_var, val, source = config_get(key)
+    if val is None:
+        typer.echo(f"\u2717 {env_var} — not set")
+        typer.echo(f"   Set with: prellm config set {key} <value>")
+        raise typer.Exit(1)
+    displayed = val if raw else mask_value(env_var, val)
+    typer.echo(f"{env_var}={displayed}")
+    typer.echo(f"   Source: {source}")
+
+
+@config_app.command("list")
+def config_list_cmd(
+    raw: bool = typer.Option(False, "--raw", "-r", help="Show unmasked secret values"),
+):
+    """List all configured values.
+
+    Example:
+        prellm config list
+        prellm config list --raw
+    """
+    from prellm.env_config import config_list
+
+    entries = config_list(show_secrets=raw)
+    if not entries:
+        typer.echo("No config values set.")
+        typer.echo("   Set with: prellm config set <key> <value>")
+        typer.echo("   Example:  prellm config set openrouter-key sk-or-v1-abc123")
+        return
+
+    typer.echo(f"\n\U0001f9e0 preLLM Configuration")
+    typer.echo(f"{'='*60}")
+
+    # Group by category
+    keys_section = []
+    models_section = []
+    settings_section = []
+    other_section = []
+
+    for var, info in entries.items():
+        alias = f" ({info['alias']})" if info["alias"] else ""
+        line = f"   {var}{alias} = {info['value']}  [{info['source']}]"
+        if "API_KEY" in var or "SECRET" in var or var == "LITELLM_MASTER_KEY":
+            keys_section.append(line)
+        elif "MODEL" in var or "DEFAULT" in var:
+            models_section.append(line)
+        elif var.startswith("PRELLM_"):
+            settings_section.append(line)
+        else:
+            other_section.append(line)
+
+    if keys_section:
+        typer.echo(f"\n\U0001f511 API Keys:")
+        for line in keys_section:
+            typer.echo(line)
+    if models_section:
+        typer.echo(f"\n\U0001f916 Models:")
+        for line in models_section:
+            typer.echo(line)
+    if settings_section:
+        typer.echo(f"\n\u2699\ufe0f  Settings:")
+        for line in settings_section:
+            typer.echo(line)
+    if other_section:
+        typer.echo(f"\n\U0001f4cb Other:")
+        for line in other_section:
+            typer.echo(line)
+
+    typer.echo(f"\n{'='*60}")
+
+
+@config_app.command("show")
+def config_show_cmd():
+    """Show effective configuration (resolved from all sources).
+
+    Example:
+        prellm config show
+    """
+    from prellm.env_config import get_env_config, mask_value
+
+    env = get_env_config()
+    typer.echo(f"\n\U0001f9e0 preLLM Effective Configuration")
+    typer.echo(f"{'='*60}")
+    typer.echo(f"   Small LLM:     {env.small_model}")
+    typer.echo(f"   Large LLM:     {env.large_model}")
+    typer.echo(f"   Strategy:      {env.strategy}")
+    typer.echo(f"   Server:        {env.host}:{env.port}")
+    typer.echo(f"   Auth:          {'ON' if env.master_key else 'OFF'}")
+    typer.echo(f"   Log level:     {env.log_level}")
+    typer.echo(f"   Max tokens:    {env.max_tokens}")
+    typer.echo(f"   Timeout:       {env.timeout}s")
+    if env.fallbacks:
+        typer.echo(f"   Fallbacks:     {', '.join(env.fallbacks)}")
+    if env.monthly_budget:
+        typer.echo(f"   Budget:        ${env.monthly_budget:.2f}/month")
+    if env.config_path:
+        typer.echo(f"   Config file:   {env.config_path}")
+
+    typer.echo(f"\n\U0001f50c Providers:")
+    for name, info in env.providers.items():
+        if info["has_key"] or name == "ollama":
+            typer.echo(f"   \u2713 {name.upper():14s} {info.get('base_url', '')}")
+        else:
+            typer.echo(f"   \u2717 {name.upper():14s} ({info.get('key_var', '')} not set)")
+
+    typer.echo(f"\n{'='*60}")
+
+
+@config_app.command("init-env")
+def config_init_env(
+    global_: bool = typer.Option(False, "--global", "-g", help="Create ~/.prellm/.env instead of project .env"),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing file"),
+):
+    """Generate a starter .env file with all available settings.
+
+    Example:
+        prellm config init-env
+        prellm config init-env --global
+    """
+    from prellm.env_config import _resolve_config_path
+
+    path = _resolve_config_path(global_)
+    if path.is_file() and not force:
+        typer.echo(f"\u26a0\ufe0f  {path} already exists. Use --force to overwrite.")
+        raise typer.Exit(1)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    template = """\
+# preLLM Configuration
+# Generated by: prellm config init-env
+# Docs: https://github.com/wronai/prellm
+
+# ── Models ──────────────────────────────────────────────
+PRELLM_SMALL_DEFAULT=ollama/qwen2.5:3b
+PRELLM_LARGE_DEFAULT=gpt-4o-mini
+PRELLM_STRATEGY=classify
+
+# ── API Keys (uncomment and fill in) ───────────────────
+# OPENAI_API_KEY=sk-...
+# ANTHROPIC_API_KEY=sk-ant-...
+# GROQ_API_KEY=gsk_...
+# MISTRAL_API_KEY=...
+# OPENROUTER_API_KEY=sk-or-v1-...
+# DEEPSEEK_API_KEY=...
+# TOGETHERAI_API_KEY=...
+# GEMINI_API_KEY=...
+# MOONSHOT_API_KEY=...
+
+# ── Azure OpenAI ───────────────────────────────────────
+# AZURE_API_KEY=...
+# AZURE_API_BASE=https://your-resource.openai.azure.com
+# AZURE_API_VERSION=2024-02-01
+
+# ── AWS Bedrock ────────────────────────────────────────
+# AWS_ACCESS_KEY_ID=...
+# AWS_SECRET_ACCESS_KEY=...
+# AWS_REGION_NAME=us-east-1
+
+# ── Ollama (local) ─────────────────────────────────────
+# OLLAMA_API_BASE=http://localhost:11434
+
+# ── OpenRouter ─────────────────────────────────────────
+# OPENROUTER_API_BASE=https://openrouter.ai/api/v1
+
+# ── Server ─────────────────────────────────────────────
+# PRELLM_HOST=0.0.0.0
+# PRELLM_PORT=8080
+# PRELLM_LOG_LEVEL=info
+# LITELLM_MASTER_KEY=sk-prellm-...
+
+# ── Limits ─────────────────────────────────────────────
+# PRELLM_MAX_TOKENS=4096
+# PRELLM_TIMEOUT=30
+# PRELLM_MONTHLY_BUDGET=50.00
+# PRELLM_FALLBACKS=ollama/llama3:8b,gpt-4o-mini
+"""
+    with open(path, "w") as f:
+        f.write(template)
+
+    typer.echo(f"\u2705 Created {path}")
+    typer.echo(f"   Edit the file to add your API keys.")
+
+
+# ============================================================
+# Models
+# ============================================================
+
+@app.command()
+def models(
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Filter by provider (e.g. openrouter, ollama, openai)"),
+    search: Optional[str] = typer.Option(None, "--search", "-s", help="Search model name"),
+):
+    """List popular model pairs and provider examples.
+
+    Examples:
+        prellm models
+        prellm models --provider openrouter
+        prellm models --search kimi
+    """
+    # Curated list of popular model pairs
+    pairs = [
+        # (name, small_llm, large_llm, cost_hint)
+        ("Ollama local (free)", "ollama/qwen2.5:3b", "ollama/llama3:8b", "$0.00"),
+        ("Ollama + OpenAI", "ollama/qwen2.5:3b", "gpt-4o-mini", "~$0.15"),
+        ("Ollama + Claude", "ollama/qwen2.5:3b", "anthropic/claude-sonnet-4-20250514", "~$0.30"),
+        ("Ollama + Kimi K2.5", "ollama/qwen2.5:3b", "openrouter/moonshotai/kimi-k2.5", "~$0.10"),
+        ("OpenAI only", "gpt-4o-mini", "gpt-4o", "~$0.20"),
+        ("Anthropic only", "anthropic/claude-haiku", "anthropic/claude-sonnet-4-20250514", "~$0.35"),
+        ("Groq fast", "groq/llama-3.1-8b-instant", "groq/llama-3.3-70b-versatile", "~$0.05"),
+        ("Mistral", "mistral/mistral-small-latest", "mistral/mistral-large-latest", "~$0.20"),
+        ("DeepSeek", "deepseek/deepseek-chat", "deepseek/deepseek-reasoner", "~$0.15"),
+        ("Google Gemini", "gemini/gemini-2.0-flash", "gemini/gemini-2.5-pro-preview-06-05", "~$0.20"),
+        ("Together AI", "together_ai/Qwen/Qwen2.5-7B-Instruct-Turbo", "together_ai/meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo", "~$0.10"),
+        ("Azure OpenAI", "azure/gpt-4o-mini-deployment", "azure/gpt-4o-deployment", "~$0.20"),
+        ("AWS Bedrock", "bedrock/anthropic.claude-3-haiku-20240307-v1:0", "bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0", "~$0.30"),
+    ]
+
+    # OpenRouter popular models
+    openrouter_models = [
+        ("openrouter/moonshotai/kimi-k2.5", "Moonshot Kimi K2.5 — strong reasoning, competitive pricing"),
+        ("openrouter/google/gemini-2.5-pro-preview-06-05", "Google Gemini 2.5 Pro"),
+        ("openrouter/anthropic/claude-sonnet-4-20250514", "Claude Sonnet 4"),
+        ("openrouter/openai/gpt-4o", "OpenAI GPT-4o"),
+        ("openrouter/meta-llama/llama-3.3-70b-instruct", "Meta Llama 3.3 70B"),
+        ("openrouter/deepseek/deepseek-r1", "DeepSeek R1 reasoning"),
+        ("openrouter/qwen/qwen-2.5-72b-instruct", "Qwen 2.5 72B"),
+        ("openrouter/mistralai/mistral-large-2411", "Mistral Large"),
+    ]
+
+    # Filter
+    if provider:
+        provider_lower = provider.lower()
+        pairs = [p for p in pairs if provider_lower in p[0].lower() or provider_lower in p[1].lower() or provider_lower in p[2].lower()]
+        openrouter_models = [m for m in openrouter_models if provider_lower in m[0].lower() or provider_lower in m[1].lower()]
+
+    if search:
+        search_lower = search.lower()
+        pairs = [p for p in pairs if search_lower in p[0].lower() or search_lower in p[1].lower() or search_lower in p[2].lower()]
+        openrouter_models = [m for m in openrouter_models if search_lower in m[0].lower() or search_lower in m[1].lower()]
+
+    typer.echo(f"\n\U0001f916 preLLM Model Pairs")
+    typer.echo(f"{'='*60}")
+
+    if pairs:
+        typer.echo(f"\n{'Name':<25s} {'Small LLM':<30s} {'Large LLM':<45s} {'Cost':>6s}")
+        typer.echo(f"{'-'*25} {'-'*30} {'-'*45} {'-'*6}")
+        for name, small, large, cost in pairs:
+            typer.echo(f"{name:<25s} {small:<30s} {large:<45s} {cost:>6s}")
+
+    if openrouter_models:
+        typer.echo(f"\n\U0001f310 OpenRouter Models (use with --large):")
+        for model_id, desc in openrouter_models:
+            typer.echo(f"   {model_id}")
+            typer.echo(f"      {desc}")
+
+    typer.echo(f"\n\U0001f4a1 Usage:")
+    typer.echo(f'   prellm "Deploy app" --large openrouter/moonshotai/kimi-k2.5')
+    typer.echo(f"   prellm config set model openrouter/moonshotai/kimi-k2.5")
+    typer.echo(f"   prellm config set openrouter-key sk-or-v1-abc123")
+    typer.echo(f"\n{'='*60}")
+
+
 if __name__ == "__main__":
     app()

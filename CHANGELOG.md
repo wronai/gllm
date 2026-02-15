@@ -1,3 +1,15 @@
+## [0.3.7] - 2026-02-15
+
+### Summary
+
+feat(goal): CLI interface improvements
+
+### Other
+
+- update prellm/cli.py
+- update prellm/env_config.py
+
+
 ## [0.3.6] - 2026-02-15
 
 ### Summary
