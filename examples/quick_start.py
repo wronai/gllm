@@ -3,7 +3,7 @@
 
 Usage:
     pip install prellm
-    ollama serve && ollama pull qwen2.5:3b
+    ollama serve && ollama pull qwen2.5:7b
     python examples/quick_start.py
 """
 
@@ -30,7 +30,7 @@ async def example_strategy():
 
     result = await preprocess_and_execute(
         query="Deploy backend v2.3 to production with rollback",
-        small_llm="ollama/qwen2.5:3b",
+        small_llm="ollama/qwen2.5:7b",
         large_llm="gpt-4o-mini",
         strategy="structure",
         user_context={"team": "backend", "env": "production"},
@@ -47,7 +47,7 @@ async def example_pipeline():
 
     result = await preprocess_and_execute(
         query="Deploy backend v2.3 to production with rollback",
-        small_llm="ollama/qwen2.5:3b",
+        small_llm="ollama/qwen2.5:7b",
         large_llm="gpt-4o-mini",
         pipeline="dual_agent_full",
     )
@@ -60,8 +60,8 @@ async def example_ollama_local():
 
     result = await preprocess_and_execute(
         query="Explain Python decorators with examples",
-        small_llm="ollama/qwen2.5:3b",
-        large_llm="ollama/llama3:8b",
+        small_llm="ollama/qwen2.5:7b",
+        large_llm="ollama/llama3:latest",
         strategy="classify",
     )
     print(f"[ollama local] {result.content[:100]}...")
@@ -73,7 +73,7 @@ async def example_hybrid_ollama_openai():
 
     result = await preprocess_and_execute(
         query="Review this Python function for security issues",
-        small_llm="ollama/qwen2.5:3b",
+        small_llm="ollama/qwen2.5:7b",
         large_llm="gpt-4o-mini",
         strategy="enrich",
     )
@@ -86,7 +86,7 @@ async def example_hybrid_ollama_anthropic():
 
     result = await preprocess_and_execute(
         query="Write Kubernetes deployment manifest for a Python app",
-        small_llm="ollama/phi3:mini",
+        small_llm="ollama/phi:latest",
         large_llm="anthropic/claude-sonnet-4-20250514",
         strategy="structure",
     )
@@ -99,7 +99,7 @@ async def example_domain_rules():
 
     result = await preprocess_and_execute(
         query="Usuń bazę danych klientów",
-        small_llm="ollama/qwen2.5:3b",
+        small_llm="ollama/qwen2.5:7b",
         large_llm="gpt-4o-mini",
         strategy="structure",
         domain_rules=[{
@@ -148,7 +148,7 @@ def example_sync():
 
     result = preprocess_and_execute_sync(
         "Explain Docker networking",
-        small_llm="ollama/qwen2.5:3b",
+        small_llm="ollama/qwen2.5:7b",
         large_llm="gpt-4o-mini",
     )
     print(f"[sync] {result.content[:100]}...")
@@ -157,7 +157,7 @@ def example_sync():
 async def example_openai_sdk_client():
     """Use preLLM server from any OpenAI SDK client."""
     print("[openai-sdk] Start preLLM server first:")
-    print("  prellm serve --port 8080 --small ollama/qwen2.5:3b --large gpt-4o-mini")
+    print("  prellm serve --port 8080 --small ollama/qwen2.5:7b --large gpt-4o-mini")
     print("  Then:")
     print("  client = openai.OpenAI(base_url='http://localhost:8080/v1', api_key='any')")
     print("  response = client.chat.completions.create(model='prellm:default', messages=[...])")

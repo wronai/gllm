@@ -1,5 +1,5 @@
 # Prellm Makefile
-.PHONY: help install install-dev test lint format clean build publish run demo init bump-patch check-bumpver check-build check-twine
+.PHONY: help install install-dev test lint format clean build publish run demo init bump-patch check-bumpver check-build check-twine examples config
 
 # Check for Poetry availability
 POETRY := $(shell command -v poetry 2>/dev/null)
@@ -28,7 +28,9 @@ help:
 	@echo "Available commands:"
 	@echo "  install      Install production dependencies"
 	@echo "  install-dev  Install development dependencies"
+	@echo "  config       Interactive LLM configuration wizard"
 	@echo "  test         Run tests"
+	@echo "  examples     Run all example scripts (real-time demos)"
 	@echo "  lint         Run linting (ruff)"
 	@echo "  format       Format code (ruff)"
 	@echo "  clean        Clean build artifacts"
@@ -121,6 +123,40 @@ check-bumpver: ## Ensure bumpver is installed
 	)
 
 # Demo and examples
+examples:
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)   preLLM Real-time Examples$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@echo ""
+	@echo "$(YELLOW)1. Quick Start Examples (async)$(NC)"
+	@echo "----------------------------------------"
+	$(PYTHON) examples/quick_start.py || echo "$(RED)Skipped: LLM providers not configured$(NC)"
+	@echo ""
+	@echo "$(YELLOW)2. Kubernetes Debugging Example$(NC)"
+	@echo "----------------------------------------"
+	$(PYTHON) examples/k8s_debug.py || echo "$(RED)Skipped: LLM providers not configured$(NC)"
+	@echo ""
+	@echo "$(YELLOW)3. Polish Finance Example$(NC)"
+	@echo "----------------------------------------"
+	$(PYTHON) examples/polish_leasing.py || echo "$(RED)Skipped: LLM providers not configured$(NC)"
+	@echo ""
+	@echo "$(YELLOW)4. Provider Configuration Example$(NC)"
+	@echo "----------------------------------------"
+	$(PYTHON) examples/providers.py || echo "$(RED)Skipped: LLM providers not configured$(NC)"
+	@echo ""
+	@echo "$(YELLOW)5. Python SDK Examples$(NC)"
+	@echo "----------------------------------------"
+	$(PYTHON) examples/python_sdk.py || echo "$(RED)Skipped: LLM providers not configured$(NC)"
+	@echo ""
+	@echo "$(GREEN)Examples completed!$(NC)"
+
+config:
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)   preLLM Interactive Configuration$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@echo ""
+	$(PYTHON) scripts/config_wizard.py
+
 run:
 	$(RUN) prellm run "deploy to production" --dry-run
 
