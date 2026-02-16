@@ -67,7 +67,7 @@ class EnvConfig:
     # Models
     small_model: str = "ollama/qwen2.5:3b"
     large_model: str = "gpt-4o-mini"
-    strategy: str = "classify"
+    strategy: str = "auto"
     fallbacks: list[str] = field(default_factory=list)
 
     # Server
@@ -137,7 +137,7 @@ def get_env_config(dotenv_path: str | Path | None = None) -> EnvConfig:
         master_key=os.getenv("LITELLM_MASTER_KEY", None) or None,
         small_model=os.getenv("PRELLM_SMALL_DEFAULT", os.getenv("SMALL_MODEL", "ollama/qwen2.5:3b")),
         large_model=os.getenv("PRELLM_LARGE_DEFAULT", os.getenv("LARGE_MODEL", "gpt-4o-mini")),
-        strategy=os.getenv("PRELLM_STRATEGY", "classify"),
+        strategy=os.getenv("PRELLM_STRATEGY", "auto"),
         fallbacks=fallbacks,
         host=os.getenv("PRELLM_HOST", "0.0.0.0"),
         port=int(os.getenv("PRELLM_PORT", "8080")),

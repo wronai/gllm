@@ -295,15 +295,18 @@ async def _execute_v3_pipeline(
         preprocessor, query, extra_context, pipeline
     )
 
-    # 3. Run execution with sanitization (large LLM)
+    # 3. Build system_prompt from preprocessing context for the large LLM
+    system_prompt = _build_executor_system_prompt(prep_result, extra_context)
+
+    # 4. Run execution with sanitization (large LLM)
     exec_result, exec_duration_ms = await _run_execution(
-        executor, prep_result.executor_input, **kwargs
+        executor, prep_result.executor_input, system_prompt=system_prompt, **kwargs
     )
 
-    # 4. Persist session if memory available
+    # 5. Persist session if memory available
     await _persist_session(user_memory, query, exec_result)
 
-    # 5. Build response
+    # 6. Build response
     trace = get_current_trace()
     _record_trace(trace, pipeline, small_llm, large_llm, query, extra_context,
                   prep_result, exec_result, prep_duration_ms, exec_duration_ms)
@@ -449,15 +452,87 @@ async def _run_preprocessing(
     return prep_result, duration_ms
 
 
+def _build_executor_system_prompt(
+    prep_result: Any,
+    extra_context: dict[str, Any],
+) -> str:
+    """Build a system prompt for the large LLM from preprocessing results and context.
+
+    Injects classification, context schema, and runtime info so the large LLM
+    understands the user's intent and environment.
+    """
+    parts: list[str] = []
+
+    # 1. Classification context
+    if prep_result.decomposition:
+        state = prep_result.decomposition.state
+        classification = state.get("classification")
+        if isinstance(classification, dict):
+            intent = classification.get("intent", "unknown")
+            confidence = classification.get("confidence", 0)
+            domain = classification.get("domain", "general")
+            parts.append(
+                f"User intent: {intent} (confidence: {confidence}, domain: {domain})"
+            )
+
+        matched_rule = state.get("matched_rule")
+        if isinstance(matched_rule, dict) and matched_rule.get("name"):
+            parts.append(f"Matched domain rule: {matched_rule['name']}")
+            if matched_rule.get("required_fields"):
+                parts.append(f"Required fields: {', '.join(matched_rule['required_fields'])}")
+
+    # 2. Available tools from context schema
+    ctx_schema = extra_context.get("context_schema")
+    if ctx_schema:
+        try:
+            import json
+            schema_data = json.loads(ctx_schema) if isinstance(ctx_schema, str) else ctx_schema
+            tools = schema_data.get("available_tools", [])
+            if tools:
+                parts.append(f"Available tools on user's system: {', '.join(tools[:15])}")
+            platform = schema_data.get("platform")
+            if platform:
+                parts.append(f"Platform: {platform}")
+            locale = schema_data.get("locale")
+            if locale:
+                parts.append(f"Locale: {locale}")
+        except Exception:
+            pass
+
+    # 3. Runtime context summary
+    runtime = extra_context.get("runtime_context")
+    if isinstance(runtime, dict):
+        sys_info = runtime.get("system", {})
+        proc_info = runtime.get("process", {})
+        if sys_info.get("os"):
+            parts.append(f"OS: {sys_info['os']} {sys_info.get('arch', '')}")
+        if sys_info.get("python"):
+            parts.append(f"Python: {sys_info['python']}")
+        if proc_info.get("cwd"):
+            parts.append(f"Working directory: {proc_info['cwd']}")
+
+    # 4. User preferences / history
+    user_ctx = extra_context.get("user_context")
+    if user_ctx:
+        parts.append(f"User context: {user_ctx}")
+
+    if not parts:
+        return ""
+
+    return "Context from preprocessing:\n" + "\n".join(f"- {p}" for p in parts)
+
+
 async def _run_execution(
     executor: ExecutorAgent,
     executor_input: str,
+    system_prompt: str = "",
     **kwargs: Any,
 ) -> tuple[Any, float]:
     """Run the large-LLM execution step. Returns (exec_result, duration_ms)."""
     _t0 = time.time()
     exec_result = await executor.execute(
         executor_input=executor_input,
+        system_prompt=system_prompt,
         **kwargs,
     )
     duration_ms = (time.time() - _t0) * 1000

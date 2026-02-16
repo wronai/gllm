@@ -4,7 +4,7 @@
 
 pipelines:
   classify:
-    description: "Classify intent, match domain rule, apply enrichment"
+    description: "Classify intent, match domain rule, compose prompt"
     steps:
       - name: classify
         prompt: classify
@@ -18,6 +18,10 @@ pipelines:
         condition: "matched_rule.get('action') == 'enrich'"
         input: [query, classification, matched_rule]
         output: enriched_query
+      - name: compose
+        prompt: compose
+        input: [query, classification, matched_rule, context]
+        output: composed_prompt
 
   structure:
     description: "Full structural decomposition"

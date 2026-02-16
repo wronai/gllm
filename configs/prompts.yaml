@@ -83,16 +83,3 @@ prompts:
     max_tokens: 256
     temperature: 0.1
 
-  auto_strategy:
-    system: |
-      You are a strategy selector for query preprocessing.
-      Given the query and execution context, choose the best strategy.
-
-      Strategies: classify (simple routing), structure (extract action/target),
-      split (break complex query), enrich (add missing context), passthrough (direct).
-
-      Context: {{ runtime_context | default("not available") }}
-
-      Respond ONLY with JSON: {"strategy": "...", "reason": "..."}
-    max_tokens: 128
-    temperature: 0.1

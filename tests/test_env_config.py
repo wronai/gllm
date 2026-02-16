@@ -21,7 +21,7 @@ class TestEnvConfigDefaults:
         cfg = EnvConfig()
         assert cfg.small_model == "ollama/qwen2.5:3b"
         assert cfg.large_model == "gpt-4o-mini"
-        assert cfg.strategy == "classify"
+        assert cfg.strategy == "auto"
         assert cfg.master_key is None
         assert cfg.host == "0.0.0.0"
         assert cfg.port == 8080

@@ -8,11 +8,16 @@ from __future__ import annotations
 
 import json
 import logging
+import warnings
 from typing import Any
 
 from nfo.decorators import log_call
 
 from prellm.models import LLMProviderConfig
+
+# Suppress Pydantic serialization warnings from litellm response objects
+# (Message/Choices/StreamingChoices field count mismatches during @log_call serialization)
+warnings.filterwarnings("ignore", message=".*PydanticSerializationUnexpectedValue.*")
 
 logger = logging.getLogger("prellm.llm_provider")
 
