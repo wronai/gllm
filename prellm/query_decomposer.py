@@ -12,6 +12,7 @@ from typing import Any
 from prellm.llm_provider import LLMProvider
 from prellm.models import (
     ClassificationResult,
+    ContextSchema,
     DecompositionResult,
     DecompositionStrategy,
     DomainRule,
@@ -57,6 +58,7 @@ class QueryDecomposer:
         query: str,
         strategy: DecompositionStrategy = DecompositionStrategy.CLASSIFY,
         context: dict[str, str] | None = None,
+        env_schema: ContextSchema | None = None,
     ) -> DecompositionResult:
         """Run the decomposition pipeline for the given strategy.
 
@@ -64,10 +66,16 @@ class QueryDecomposer:
             query: The raw user query.
             strategy: Which decomposition strategy to use.
             context: Optional runtime context (env, git, system).
+            env_schema: Optional environment context schema for AUTO strategy.
 
         Returns:
             DecompositionResult with all extracted information.
         """
+        # AUTO: let small LLM pick the strategy
+        if strategy == DecompositionStrategy.AUTO:
+            strategy = await self._auto_select_strategy(query, env_schema)
+            logger.info(f"AUTO strategy selected: {strategy.value}")
+
         result = DecompositionResult(
             strategy=strategy,
             original_query=query,
@@ -263,6 +271,45 @@ class QueryDecomposer:
                 best_match = rule
 
         return best_match if best_score > 0 else None
+
+    async def _auto_select_strategy(
+        self,
+        query: str,
+        schema: ContextSchema | None = None,
+    ) -> DecompositionStrategy:
+        """Use small LLM to select the best decomposition strategy."""
+        schema_text = ""
+        if schema:
+            schema_text = schema.model_dump_json(indent=2)
+
+        system_prompt = (
+            "You are a strategy selector. Given a query and execution context, "
+            "choose the best preprocessing strategy.\n\n"
+            "Available strategies:\n"
+            "- classify: Quick intent routing (simple queries)\n"
+            "- structure: Extract action/target/params (DevOps, API calls)\n"
+            "- split: Break into sub-queries (complex multi-part)\n"
+            "- enrich: Add missing context (incomplete prompts)\n"
+            "- passthrough: No preprocessing (direct queries)\n"
+        )
+        if schema_text:
+            system_prompt += f"\nContext schema:\n{schema_text}\n"
+        system_prompt += '\nRespond ONLY with JSON: {"strategy": "...", "reason": "..."}'
+
+        try:
+            data = await self.small_llm.complete_json(
+                user_message=query,
+                system_prompt=system_prompt,
+            )
+            selected = data.get("strategy", "classify")
+            valid = {s.value for s in DecompositionStrategy if s != DecompositionStrategy.AUTO}
+            if selected in valid:
+                return DecompositionStrategy(selected)
+            logger.warning(f"AUTO selected invalid strategy '{selected}', falling back to classify")
+        except Exception as e:
+            logger.warning(f"AUTO strategy selection failed: {e}")
+
+        return DecompositionStrategy.CLASSIFY
 
     @staticmethod
     def _find_missing_fields(

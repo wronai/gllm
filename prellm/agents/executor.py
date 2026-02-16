@@ -49,10 +49,12 @@ class ExecutorAgent:
         large_llm: LLMProvider,
         response_validator: ResponseValidator | None = None,
         response_schema_name: str | None = None,
+        sensitive_filter: Any | None = None,
     ):
         self.large_llm = large_llm
         self.response_validator = response_validator
         self.response_schema_name = response_schema_name
+        self.sensitive_filter = sensitive_filter
 
     @log_call
     async def execute(
@@ -71,6 +73,12 @@ class ExecutorAgent:
         Returns:
             ExecutorResult with content, model info, and validation status.
         """
+        # Sanitize input before sending to large LLM
+        if self.sensitive_filter:
+            executor_input = self.sensitive_filter.sanitize_text(executor_input)
+            if system_prompt:
+                system_prompt = self.sensitive_filter.sanitize_text(system_prompt)
+
         retries = 0
 
         try:

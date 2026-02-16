@@ -1,3 +1,28 @@
+## [0.3.15] - 2026-02-16
+
+### Summary
+
+feat(docs): CLI interface improvements
+
+### Build
+
+- update pyproject.toml
+
+### Other
+
+- update .prellm/budget.json
+- update ".prellm/trace_20260216_103122_Zdeployuj_apk\304\231_na_prod.md"
+- update prellm/agents/executor.py
+- update prellm/cli.py
+- update prellm/context/__init__.py
+- update prellm/context/folder_compressor.py
+- update prellm/context/schema_generator.py
+- update prellm/core.py
+- update prellm/query_decomposer.py
+- update project.functions.toon
+- ... and 1 more
+
+
 ## [0.3.14] - 2026-02-16
 
 ### Summary

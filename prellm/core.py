@@ -70,6 +70,9 @@ async def preprocess_and_execute(
     schemas_path: str | Path | None = None,
     memory_path: str | Path | None = None,
     codebase_path: str | Path | None = None,
+    collect_env: bool = False,
+    compress_folder: bool = False,
+    sanitize: bool = False,
     **kwargs: Any,
 ) -> PreLLMResponse:
     """One function to preprocess and execute — like litellm.completion() but with small LLM decomposition.
@@ -152,6 +155,9 @@ async def preprocess_and_execute(
         schemas_path=schemas_path,
         memory_path=memory_path,
         codebase_path=codebase_path,
+        collect_env=collect_env,
+        compress_folder=compress_folder,
+        sanitize=sanitize,
         **kwargs,
     )
 
@@ -211,6 +217,9 @@ async def _execute_v3_pipeline(
     schemas_path: str | Path | None = None,
     memory_path: str | Path | None = None,
     codebase_path: str | Path | None = None,
+    collect_env: bool = False,
+    compress_folder: bool = False,
+    sanitize: bool = False,
     **kwargs: Any,
 ) -> PreLLMResponse:
     """Two-agent execution path — PreprocessorAgent + ExecutorAgent + PromptPipeline."""
@@ -244,6 +253,51 @@ async def _execute_v3_pipeline(
     if domain_rules:
         extra_context["domain_rules"] = domain_rules
 
+    # --- NEW: Collect shell context ---
+    shell_ctx = None
+    if collect_env:
+        try:
+            from prellm.context.shell_collector import ShellContextCollector
+            shell_ctx = ShellContextCollector().collect_all()
+            extra_context["shell_context"] = shell_ctx.model_dump_json()
+        except Exception as e:
+            logger.warning(f"Shell context collection failed: {e}")
+
+    # --- NEW: Compress folder ---
+    compressed = None
+    if compress_folder and codebase_path:
+        try:
+            from prellm.context.folder_compressor import FolderCompressor
+            compressed = FolderCompressor().compress(codebase_path)
+            extra_context["folder_compressed"] = compressed.toon_output
+        except Exception as e:
+            logger.warning(f"Folder compression failed: {e}")
+
+    # --- NEW: Generate context schema ---
+    env_schema = None
+    if collect_env or compress_folder:
+        try:
+            from prellm.context.schema_generator import ContextSchemaGenerator
+            env_schema = ContextSchemaGenerator().generate(
+                shell_context=shell_ctx,
+                folder_compressed=compressed,
+            )
+            extra_context["context_schema"] = env_schema.model_dump_json()
+        except Exception as e:
+            logger.warning(f"Context schema generation failed: {e}")
+
+    # --- NEW: Build sensitive filter ---
+    sensitive_filter = None
+    if sanitize:
+        try:
+            from prellm.context.sensitive_filter import SensitiveDataFilter
+            sensitive_filter = SensitiveDataFilter()
+            # Filter the extra_context dict
+            filtered = sensitive_filter.filter_context_for_large_llm(extra_context)
+            extra_context = filtered
+        except Exception as e:
+            logger.warning(f"Sensitive filtering failed: {e}")
+
     # Build optional context enrichment
     user_memory = None
     if memory_path:
@@ -274,6 +328,7 @@ async def _execute_v3_pipeline(
     executor = ExecutorAgent(
         large_llm=large_provider,
         response_validator=ResponseValidator(schemas_path=schemas_path) if schemas_path else None,
+        sensitive_filter=sensitive_filter,
     )
 
     # 1. Preprocess

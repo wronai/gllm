@@ -41,6 +41,11 @@ def query(
     config: Optional[Path] = typer.Option(None, "--config", "-c", help="Optional YAML config file"),
     memory: Optional[Path] = typer.Option(None, "--memory", "-m", help="Path to UserMemory database"),
     codebase: Optional[Path] = typer.Option(None, "--codebase", help="Path to codebase root for context indexing"),
+    collect_env: bool = typer.Option(False, "--collect-env", help="Collect full shell environment context"),
+    compress_folder: Optional[Path] = typer.Option(None, "--compress-folder", help="Compress folder for context (path)"),
+    no_sanitize: bool = typer.Option(False, "--no-sanitize", help="Disable sensitive data filtering (dev only)"),
+    show_schema: bool = typer.Option(False, "--show-schema", help="Show generated context schema (debug)"),
+    show_blocked: bool = typer.Option(False, "--show-blocked", help="Show blocked sensitive fields"),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
     trace: bool = typer.Option(False, "--trace", "-t", help="Generate markdown execution trace (.prellm/)"),
     trace_dir: Optional[Path] = typer.Option(None, "--trace-dir", help="Trace output directory (default: .prellm)"),
@@ -74,6 +79,39 @@ def query(
             strategy=effective_strategy,
         )
 
+    effective_codebase = str(codebase) if codebase else (str(compress_folder) if compress_folder else None)
+    do_sanitize = not no_sanitize
+    do_compress = compress_folder is not None
+
+    # Show schema before execution if requested
+    if show_schema and (collect_env or do_compress):
+        from prellm.context.shell_collector import ShellContextCollector
+        from prellm.context.schema_generator import ContextSchemaGenerator
+        from prellm.context.folder_compressor import FolderCompressor
+
+        shell_ctx = ShellContextCollector().collect_all() if collect_env else None
+        compressed = FolderCompressor().compress(compress_folder) if compress_folder else None
+        schema = ContextSchemaGenerator().generate(shell_context=shell_ctx, folder_compressed=compressed)
+        typer.echo(f"\n📋 Context Schema:")
+        typer.echo(schema.model_dump_json(indent=2))
+        typer.echo("")
+
+    # Show blocked fields if requested
+    if show_blocked and collect_env:
+        from prellm.context.shell_collector import ShellContextCollector
+        from prellm.context.sensitive_filter import SensitiveDataFilter
+
+        collector = ShellContextCollector()
+        all_vars = collector.collect_env_vars(safe_only=False)
+        filt = SensitiveDataFilter()
+        filt.filter_dict(all_vars)
+        report = filt.get_filter_report()
+        typer.echo(f"\n🔒 Sensitive Filter Report:")
+        typer.echo(f"   Blocked:  {len(report.blocked_keys)} — {', '.join(report.blocked_keys[:10])}")
+        typer.echo(f"   Masked:   {len(report.masked_keys)} — {', '.join(report.masked_keys[:10])}")
+        typer.echo(f"   Safe:     {len(report.safe_keys)}")
+        typer.echo("")
+
     result = asyncio.run(preprocess_and_execute(
         query=prompt,
         small_llm=effective_small,
@@ -82,7 +120,10 @@ def query(
         user_context=context,
         config_path=str(config) if config else None,
         memory_path=str(memory) if memory else None,
-        codebase_path=str(codebase) if codebase else None,
+        codebase_path=effective_codebase,
+        collect_env=collect_env,
+        compress_folder=do_compress,
+        sanitize=do_sanitize,
     ))
 
     # Stop trace and output

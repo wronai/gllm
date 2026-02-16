@@ -1,6 +1,6 @@
 project: prellm
-generated: "2026-02-16T09:58:14.930796"
-modules[55]{path,lang,items}:
+generated: "2026-02-16T10:33:39.306057"
+modules[59]{path,lang,items}:
   examples/embedded_refactor.py,python,1
   examples/providers.py,python,17
   examples/quick_start.py,python,12
@@ -14,7 +14,7 @@ modules[55]{path,lang,items}:
   prellm/logging_setup.py,python,3
   prellm/server.py,python,9
   prellm/__init__.py,python,0
-  prellm/query_decomposer.py,python,9
+  prellm/query_decomposer.py,python,10
   prellm/prompt_registry.py,python,11
   prellm/validators.py,python,8
   prellm/models.py,python,0
@@ -48,9 +48,13 @@ modules[55]{path,lang,items}:
   scripts/config_wizard.py,python,19
   prellm/chains/__init__.py,python,0
   prellm/chains/process_chain.py,python,10
+  prellm/context/folder_compressor.py,python,10
+  prellm/context/shell_collector.py,python,8
   prellm/context/user_memory.py,python,9
+  prellm/context/sensitive_filter.py,python,10
   prellm/context/__init__.py,python,0
   prellm/context/codebase_indexer.py,python,12
+  prellm/context/schema_generator.py,python,9
   prellm/analyzers/__init__.py,python,0
   prellm/analyzers/context_engine.py,python,8
   prellm/agents/preprocessor.py,python,6
@@ -184,16 +188,17 @@ function_details:
       create_app,function,"(small_model:Any=None, large_model:Any=None, strategy:Any=None, config_path:Any=None, master_key:Any=None, dotenv_path:Any=None) -> FastAPI",415-447,false,33,7,Factory function to create a configured preLLM API server.
       AuthMiddleware.dispatch,method,"(request:Request, call_next)",139-158,true,20,5,sends
   prellm/query_decomposer.py:
-    functions[9]{name,kind,sig,loc,async,lines,cc,does}:
-      QueryDecomposer.__init__,method,"(small_llm:LLMProvider, prompts:Any=None, domain_rules:Any=None)",45-53,false,9,3,creates
-      QueryDecomposer.decompose,method,"(query:str, strategy:DecompositionStrategy=DecompositionStrategy.CLASSIFY, context:Any=None) -> DecompositionResult",55-111,true,57,7,Run the decomposition pipeline for the given strategy.
-      QueryDecomposer._classify,method,"(query:str) -> ClassificationResult",113-127,true,15,2,Classify the query intent and domain using the small LLM.
-      QueryDecomposer._structure,method,"(query:str) -> StructureResult",129-143,true,15,2,Extract structured fields from the query.
-      QueryDecomposer._split,method,"(query:str) -> list[str]",145-158,true,14,4,Split a complex query into sub-queries.
-      QueryDecomposer._enrich,method,"(query:str, result:DecompositionResult, context:Any) -> str",160-189,true,30,7,Enrich the query with missing context using the small LLM.
-      QueryDecomposer._compose,method,"(query:str, result:DecompositionResult, context:Any) -> str",191-236,true,46,9,Compose the final prompt for the large LLM.
-      QueryDecomposer._match_domain_rule,method,"(query:str, classification:ClassificationResult) -> DomainRule | None",238-265,false,28,8,Find the best matching domain rule for the query.
-      QueryDecomposer._find_missing_fields,method,"(query:str, rule:DomainRule, context:Any) -> list[str]",268-283,false,16,5,Determine which required fields are missing from the query and context.
+    functions[10]{name,kind,sig,loc,async,lines,cc,does}:
+      QueryDecomposer.__init__,method,"(small_llm:LLMProvider, prompts:Any=None, domain_rules:Any=None)",46-54,false,9,3,creates
+      QueryDecomposer.decompose,method,"(query:str, strategy:DecompositionStrategy=DecompositionStrategy.CLASSIFY, context:Any=None, env_schema:Any=None) -> DecompositionResult",56-119,true,64,8,Run the decomposition pipeline for the given strategy.
+      QueryDecomposer._classify,method,"(query:str) -> ClassificationResult",121-135,true,15,2,Classify the query intent and domain using the small LLM.
+      QueryDecomposer._structure,method,"(query:str) -> StructureResult",137-151,true,15,2,Extract structured fields from the query.
+      QueryDecomposer._split,method,"(query:str) -> list[str]",153-166,true,14,4,Split a complex query into sub-queries.
+      QueryDecomposer._enrich,method,"(query:str, result:DecompositionResult, context:Any) -> str",168-197,true,30,7,Enrich the query with missing context using the small LLM.
+      QueryDecomposer._compose,method,"(query:str, result:DecompositionResult, context:Any) -> str",199-244,true,46,9,Compose the final prompt for the large LLM.
+      QueryDecomposer._match_domain_rule,method,"(query:str, classification:ClassificationResult) -> DomainRule | None",246-273,false,28,8,Find the best matching domain rule for the query.
+      QueryDecomposer._auto_select_strategy,method,"(query:str, schema:Any=None) -> DecompositionStrategy",275-312,true,38,7,Use small LLM to select the best decomposition strategy.
+      QueryDecomposer._find_missing_fields,method,"(query:str, rule:DomainRule, context:Any) -> list[str]",315-330,false,16,5,Determine which required fields are missing from the query and context.
   prellm/prompt_registry.py:
     functions[11]{name,kind,sig,loc,async,lines,cc,does}:
       PromptEntry.__init__,method,"(name:str, system_template:str, max_tokens:int=512, temperature:float=0.1)",35-39,false,5,1,creates
@@ -219,16 +224,16 @@ function_details:
       ResponseValidator._check_constraints,method,"(value:Any, constraint:dict[str,Any], field:str) -> list[str]",187-213,false,27,14,Check constraints on a value.
   prellm/core.py:
     functions[10]{name,kind,sig,loc,async,lines,cc,does}:
-      preprocess_and_execute,function,"(query:str, small_llm:str='ollama/qwen2.5:3b', large_llm:str='anthropic/claude-sonnet-4-20250514', strategy:Any='classify', user_context:Any=None, config_path:Any=None, domain_rules:Any=None, pipeline:Any=None) -> PreLLMResponse",59-156,true,98,11,One function to preprocess and execute — like litellm.completion() but with smal...
-      preprocess_and_execute_sync,function,"(query:str, small_llm:str='ollama/qwen2.5:3b', large_llm:str='anthropic/claude-sonnet-4-20250514', strategy:Any='classify', user_context:Any=None, config_path:Any=None, domain_rules:Any=None, pipeline:Any=None) -> PreLLMResponse",160-194,false,35,1,Synchronous version of preprocess_and_execute() — runs the async function in an...
-      _execute_v3_pipeline,function,"(query:str, small_llm:str, large_llm:str, pipeline:str, user_context:Any=None, domain_rules:Any=None, prompts_path:Any=None, pipelines_path:Any=None) -> PreLLMResponse",202-357,true,156,29,Two-agent execution path — PreprocessorAgent + ExecutorAgent + PromptPipeline.
-      _build_decomposition_result,function,"(query:str, pipeline_name:str, prep_result:Any) -> DecompositionResult | None",360-419,false,60,16,Build a backward-compatible DecompositionResult from pipeline state.
-      PreLLM.__init__,method,"(config_path:Any=None, config:Any=None)",446-466,false,21,3,creates
-      PreLLM.__call__,method,"(query:str, strategy:Any=None, extra_context:Any=None) -> PreLLMResponse",468-528,true,61,6,"Full pipeline: context → decompose (small LLM) → large LLM → response."
-      PreLLM.decompose_only,method,"(query:str, strategy:Any=None, extra_context:Any=None) -> dict[str, Any]",530-558,true,29,5,Run decomposition without calling the large LLM — useful for dry-run / testing.
-      PreLLM.get_audit_log,method,"() -> list[dict[str, Any]]",560-562,false,3,2,Return audit log as list of dicts.
-      PreLLM._audit,method,"(action:str, query:str, response:PreLLMResponse) -> None",564-576,false,13,3,audit
-      PreLLM._load_config,method,"(path:Path) -> PreLLMConfig",579-619,false,41,10,Load preLLM v0.2 config from YAML file.
+      preprocess_and_execute,function,"(query:str, small_llm:str='ollama/qwen2.5:3b', large_llm:str='anthropic/claude-sonnet-4-20250514', strategy:Any='classify', user_context:Any=None, config_path:Any=None, domain_rules:Any=None, pipeline:Any=None) -> PreLLMResponse",59-162,true,104,11,One function to preprocess and execute — like litellm.completion() but with smal...
+      preprocess_and_execute_sync,function,"(query:str, small_llm:str='ollama/qwen2.5:3b', large_llm:str='anthropic/claude-sonnet-4-20250514', strategy:Any='classify', user_context:Any=None, config_path:Any=None, domain_rules:Any=None, pipeline:Any=None) -> PreLLMResponse",166-200,false,35,1,Synchronous version of preprocess_and_execute() — runs the async function in an...
+      _execute_v3_pipeline,function,"(query:str, small_llm:str, large_llm:str, pipeline:str, user_context:Any=None, domain_rules:Any=None, prompts_path:Any=None, pipelines_path:Any=None) -> PreLLMResponse",208-412,true,205,39,Two-agent execution path — PreprocessorAgent + ExecutorAgent + PromptPipeline.
+      _build_decomposition_result,function,"(query:str, pipeline_name:str, prep_result:Any) -> DecompositionResult | None",415-474,false,60,16,Build a backward-compatible DecompositionResult from pipeline state.
+      PreLLM.__init__,method,"(config_path:Any=None, config:Any=None)",501-521,false,21,3,creates
+      PreLLM.__call__,method,"(query:str, strategy:Any=None, extra_context:Any=None) -> PreLLMResponse",523-583,true,61,6,"Full pipeline: context → decompose (small LLM) → large LLM → response."
+      PreLLM.decompose_only,method,"(query:str, strategy:Any=None, extra_context:Any=None) -> dict[str, Any]",585-613,true,29,5,Run decomposition without calling the large LLM — useful for dry-run / testing.
+      PreLLM.get_audit_log,method,"() -> list[dict[str, Any]]",615-617,false,3,2,Return audit log as list of dicts.
+      PreLLM._audit,method,"(action:str, query:str, response:PreLLMResponse) -> None",619-631,false,13,3,audit
+      PreLLM._load_config,method,"(path:Path) -> PreLLMConfig",634-674,false,41,10,Load preLLM v0.2 config from YAML file.
   prellm/llm_provider.py:
     functions[6]{name,kind,sig,loc,async,lines,cc,does}:
       LLMProvider.__init__,method,"(config:LLMProviderConfig)",28-30,false,3,1,creates
@@ -671,6 +676,28 @@ function_details:
       ProcessChain.get_audit_log,method,"() -> list[dict[str, Any]]",248-249,false,2,2,retrieves audit log
       ProcessChain._audit_step,method,"(step_name:str, prompt:str, response:str) -> None",251-259,false,9,2,audit step
       ProcessChain._load_process_config,method,"(path:Path) -> ProcessConfig",262-275,false,14,3,retrieves process config
+  prellm/context/folder_compressor.py:
+    functions[10]{name,kind,sig,loc,async,lines,cc,does}:
+      _relative_path,function,"(path:str, root:str) -> str",158-163,false,6,2,Get relative path from root.
+      _path_to_module,function,"(rel_path:str) -> str",166-173,false,8,3,Convert file path to Python module name.
+      _extract_module_from_import,function,"(import_line:str, project_name:str) -> str | None",176-192,false,17,7,"Extract module name from import statement, only return internal imports."
+      _extract_module_docstring,function,"(path:str) -> str",195-217,false,23,6,Extract first line of module docstring.
+      FolderCompressor.__init__,method,"(indexer:Any=None)",27-28,false,2,2,creates
+      FolderCompressor.compress,method,"(root:Any, format:str='toon', exclude_dirs:Any=None) -> CompressedFolder",30-67,false,38,4,Compress folder to a lightweight representation.
+      FolderCompressor.to_toon,method,"(index:CodebaseIndex) -> str",69-94,false,26,8,Format index as .toon — standardized compact representation.
+      FolderCompressor.to_dependency_graph,method,"(index:CodebaseIndex) -> dict[str, list[str]]",96-123,false,28,10,Build module → list of imported internal modules.
+      FolderCompressor.to_summary,method,"(index:CodebaseIndex) -> dict[str, str]",125-150,false,26,11,Generate 1-line summary per module from docstrings or names.
+      FolderCompressor.estimate_token_count,method,"(text:str) -> int",153-155,false,3,1,Estimate token count — rough approximation (1 token ≈ 4 chars).
+  prellm/context/shell_collector.py:
+    functions[8]{name,kind,sig,loc,async,lines,cc,does}:
+      ShellContextCollector.__init__,method,"(extra_safe_keys:Any=None)",47-48,false,2,2,creates
+      ShellContextCollector.collect_env_vars,method,"(safe_only:bool=True) -> dict[str, str]",50-58,false,9,4,"Collect environment variables, optionally filtering sensitive ones."
+      ShellContextCollector.collect_process_info,method,() -> ProcessInfo,60-73,false,14,4,Collect current process information.
+      ShellContextCollector.collect_locale_info,method,() -> LocaleInfo,75-90,false,16,3,Collect locale and timezone information.
+      ShellContextCollector.collect_shell_info,method,() -> ShellInfo,92-109,false,18,2,Collect shell and terminal information.
+      ShellContextCollector.collect_network_context,method,() -> NetworkContext,111-138,false,28,5,"Collect network context — hostname, local IP."
+      ShellContextCollector.collect_all,method,"(safe_only:bool=True) -> ShellContext",140-159,false,20,1,Collect full shell context snapshot as a Pydantic model.
+      ShellContextCollector._is_safe_key,method,"(key:str) -> bool",161-169,false,9,4,Check if an env var key is safe to expose.
   prellm/context/user_memory.py:
     functions[9]{name,kind,sig,loc,async,lines,cc,does}:
       UserMemory.__init__,method,"(backend:str='sqlite', path:Any=_DEFAULT_DB_PATH)",41-52,false,12,3,creates
@@ -682,6 +709,18 @@ function_details:
       UserMemory.set_preference,method,"(key:str, value:str) -> None",190-199,true,10,3,Set a user preference.
       UserMemory.clear,method,() -> None,201-219,true,19,6,Clear all stored data (for testing).
       UserMemory.close,method,() -> None,221-230,false,10,3,Close the database connection.
+  prellm/context/sensitive_filter.py:
+    functions[10]{name,kind,sig,loc,async,lines,cc,does}:
+      SensitiveDataFilter.__init__,method,"(rules_path:Any=None, extra_blocked:Any=None, extra_safe:Any=None)",62-83,false,22,6,creates
+      SensitiveDataFilter._load_rules,method,"(path:Path) -> None",85-108,false,24,7,Load custom sensitive rules from YAML.
+      SensitiveDataFilter.classify_key,method,"(key:str) -> SensitivityLevel",110-123,false,14,6,"Classify a key name as SAFE, MASKED, or BLOCKED."
+      SensitiveDataFilter.classify_value,method,"(value:str) -> SensitivityLevel",125-130,false,6,3,Classify a value by checking against known token/key patterns.
+      SensitiveDataFilter.filter_dict,method,"(data:dict[str,str], level:SensitivityLevel=SensitivityLevel.MASKED) -> dict[str, str]",132-170,false,39,6,Filter a dict — mask or remove sensitive entries.
+      SensitiveDataFilter.filter_context_for_large_llm,method,"(context:dict[str,Any]) -> dict[str, Any]",172-177,false,6,1,"Strict filter: removes EVERYTHING that could be sensitive before large LLM."
+      SensitiveDataFilter.sanitize_text,method,"(text:str) -> str",179-184,false,6,2,Find and redact tokens/keys embedded in free text.
+      SensitiveDataFilter.get_filter_report,method,() -> FilterReport,186-188,false,3,1,Return report of what was blocked/masked in the last filter_dict call.
+      SensitiveDataFilter._filter_recursive,method,"(data:Any) -> Any",190-213,false,24,12,Recursively filter a data structure.
+      SensitiveDataFilter._mask_value,method,"(value:str) -> str",216-220,false,5,2,"Mask a sensitive value, keeping first 2 and last 2 chars."
   prellm/context/codebase_indexer.py:
     functions[12]{name,kind,sig,loc,async,lines,cc,does}:
       CodebaseIndexer.__init__,method,"(languages:Any=None)",79-88,false,10,1,Initialize indexer.
@@ -696,6 +735,17 @@ function_details:
       CodebaseIndexer._extract_imports,method,"(content:str, language:str) -> list[str]",307-321,false,15,7,Extract import statements.
       CodebaseIndexer.search,method,"(index:CodebaseIndex, query:str, limit:int=20) -> list[CodeSymbol]",323-341,false,19,6,Search the index for symbols matching a query string.
       CodebaseIndexer.get_context_for_query,method,"(index:CodebaseIndex, query:str, max_symbols:int=10) -> str",343-357,false,15,3,Build a context string from the index for a given query.
+  prellm/context/schema_generator.py:
+    functions[9]{name,kind,sig,loc,async,lines,cc,does}:
+      ContextSchemaGenerator.generate,method,"(shell_context:Any=None, folder_compressed:Any=None, user_memory:Any=None, domain_rules:Any=None, sensitive_blocked:int=0) -> ContextSchema",43-91,false,49,6,Compose schema from available context sources.
+      ContextSchemaGenerator.to_prompt_section,method,"(schema:ContextSchema) -> str",93-114,false,22,8,Format schema as a prompt section for small-LLM.
+      ContextSchemaGenerator.estimate_relevance,method,"(schema:ContextSchema, query:str) -> dict[str, float]",116-151,false,36,11,Score which context parts are relevant for the query (0-1).
+      ContextSchemaGenerator._detect_execution_env,method,"(shell_context:ShellContext) -> str",154-163,false,10,5,Detect execution environment from shell context.
+      ContextSchemaGenerator._detect_tools,method,"() -> list[str]",166-172,false,7,3,Detect which common tools are available on the system.
+      ContextSchemaGenerator._detect_project_type,method,"(compressed:CompressedFolder) -> str | None",175-186,false,12,6,Detect project type from compressed folder data.
+      ContextSchemaGenerator._build_project_summary,method,"(compressed:CompressedFolder) -> str",189-195,false,7,1,Build a 1-line project summary from compressed data.
+      ContextSchemaGenerator._summarize_history,method,"(history:list[dict[str,Any]]) -> str",198-205,false,8,6,Summarize recent user interaction history.
+      ContextSchemaGenerator._estimate_token_cost,method,"(schema:ContextSchema) -> int",208-211,false,4,1,Estimate how many tokens the schema will use in a prompt.
   prellm/analyzers/context_engine.py:
     functions[8]{name,kind,sig,loc,async,lines,cc,does}:
       ContextEngine.__init__,method,"(context_sources:Any=None)",16-17,false,2,2,creates
@@ -716,6 +766,6 @@ function_details:
       PreprocessorAgent._extract_confidence,method,"(pipeline_result:PipelineResult) -> float",174-179,false,6,2,Extract confidence score from classification step if available.
   prellm/agents/executor.py:
     functions[3]{name,kind,sig,loc,async,lines,cc,does}:
-      ExecutorAgent.__init__,method,"(large_llm:LLMProvider, response_validator:Any=None, response_schema_name:Any=None)",47-55,false,9,1,creates
-      ExecutorAgent.execute,method,"(executor_input:str, system_prompt:str='') -> ExecutorResult",58-102,true,45,6,Execute the task with the large LLM.
-      ExecutorAgent._validate_response,method,"(content:str) -> ValidationResult | None",104-120,false,17,5,Validate response content against the configured schema.
+      ExecutorAgent.__init__,method,"(large_llm:LLMProvider, response_validator:Any=None, response_schema_name:Any=None, sensitive_filter:Any=None)",47-57,false,11,1,creates
+      ExecutorAgent.execute,method,"(executor_input:str, system_prompt:str='') -> ExecutorResult",60-110,true,51,8,Execute the task with the large LLM.
+      ExecutorAgent._validate_response,method,"(content:str) -> ValidationResult | None",112-128,false,17,5,Validate response content against the configured schema.

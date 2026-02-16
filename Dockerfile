@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends git curl && \
 COPY pyproject.toml README.md ./
 COPY prellm/ prellm/
 COPY configs/ configs/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir . && \
+    pip install --no-cache-dir --force-reinstall "typer[all]>=0.15"
 
 # Environment variables for server mode
 ENV SMALL_MODEL="ollama/qwen2.5:3b"
