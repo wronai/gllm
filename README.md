@@ -42,6 +42,44 @@ prellm doctor --live
 make examples       # runs all example scripts (real-time)
 ```
 
+## v0.4: Persistent Context for Small LLMs
+
+> **New in v0.4** — preLLM automatically collects env, compresses codebase, persists sessions, and filters sensitive data. Zero manual pre-prompts.
+> **Docs:** [Persistent Context](docs/persistent-context.md) · [Session Persistence](docs/session-persistence.md) · [Sensitive Data](docs/sensitive-data.md) · [Flow Graphs](docs/flow-graphs.md)
+
+```python
+from prellm import preprocess_and_execute
+
+# Bielik with full persistent context — zero manual pre-prompts
+result = await preprocess_and_execute(
+    query="Zoptymalizuj monitoring ESP32",
+    small_llm="ollama/bielik:7b",
+    large_llm="openrouter/google/gemini-3-flash-preview",
+    strategy="auto",                        # auto-select best strategy (NEW default)
+    collect_runtime=True,                   # full env/shell/process snapshot (NEW)
+    session_path=".prellm/sessions.db",     # persistent history across restarts (NEW)
+    codebase_path=".",                      # compress project → context (NEW)
+    sanitize=True,                          # filter API keys before large-LLM (NEW default)
+)
+```
+
+### New CLI Commands
+
+```bash
+# Inspect runtime context
+prellm context show                    # formatted runtime context
+prellm context show --json             # as JSON
+prellm context show --codebase .       # include compressed project
+
+# Manage persistent sessions
+prellm session list                    # recent interactions
+prellm session export backup.json      # export to JSON
+prellm session import backup.json      # import from JSON
+prellm session clear                   # clear history
+```
+
+---
+
 ## How It Works
 
 ```text
@@ -625,13 +663,26 @@ result = await preprocess_and_execute(
 
 ---
 
+## Documentation
+
+| Doc | Description |
+| --- | --- |
+| [Persistent Context](docs/persistent-context.md) | v0.4 architecture — RuntimeContext, auto-env, codebase compression |
+| [Session Persistence](docs/session-persistence.md) | Export/import sessions, RAG retrieval, auto-inject, auto-learn |
+| [Sensitive Data](docs/sensitive-data.md) | 3-level filtering (safe/masked/blocked), YAML rules, integration |
+| [Flow Graphs](docs/flow-graphs.md) | Mermaid diagrams — pipelines, context flow, streaming, Docker |
+| [CHANGELOG](CHANGELOG.md) | Version history with detailed v0.4.0 entry |
+| [ROADMAP](ROADMAP.md) | 12-month plan with completed milestones |
+
+---
+
 ## Development
 
 ```bash
 git clone https://github.com/wronai/prellm
 cd prellm
 poetry install
-poetry run pytest                 # 280+ tests (core + examples)
+poetry run pytest                 # 376 tests (core + v0.4 context + examples)
 poetry run pytest --cov           # coverage report
 poetry run ruff check prellm/     # linting
 ```

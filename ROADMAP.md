@@ -117,7 +117,20 @@ Cost: $0.015 + $0.52 = $0.535
 - [x] **nfo structured logging** — `@log_call` / `@catch` decorators across pipeline
 - [x] **FolderCompressor** — .toon format project compression for LLM context
 
-### Month 5–7: Proxy Server & Docker
+### Month 5–6: Persistent Context for Small LLMs v0.4 ✅ (NEW)
+- [x] **RuntimeContext** — unified env/process/locale/network/git/system snapshot ([docs](docs/persistent-context.md))
+- [x] **SessionPersistence** — export/import sessions, RAG retrieval, auto-inject context ([docs](docs/session-persistence.md))
+- [x] **SensitiveDataFilter** — 3-level classification (safe/masked/blocked), YAML rules ([docs](docs/sensitive-data.md))
+- [x] **CodebaseCompressor** — `.toon` format, dependency graph, query-filtered context with token budget
+- [x] **Auto strategy** — small-LLM auto-selects best decomposition strategy (default: `"auto"`)
+- [x] **Context-aware pipeline** — 6-step YAML pipeline: collect → inject → classify → decompose → compose → sanitize
+- [x] **core.py refactored** — `_execute_v3_pipeline` split from cc≈29 into 5 methods (cc≤10)
+- [x] **CLI `prellm context`** — inspect runtime context, blocked vars, compressed codebase
+- [x] **CLI `prellm session`** — list/export/import/clear persistent sessions
+- [x] **Trace `context_collection`** — new step type for runtime/session/sanitize in execution trace
+- [x] 376 tests (47 new v0.4 + 329 existing, 0 regressions)
+
+### Month 6–8: Proxy Server & Docker
 - [x] FastAPI proxy server (OpenAI-compatible `/v1/chat/completions`)
 - [x] Streaming SSE support with stage progress
 - [x] Docker image builds and runs (`docker build -t prellm .`)

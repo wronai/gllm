@@ -1,3 +1,90 @@
+## [0.4.2] - 2026-02-16
+
+### Summary
+
+feat(docs): configuration management system
+
+### Docs
+
+- docs: update README
+- docs: update ROADMAP.md
+- docs: update flow-graphs.md
+- docs: update persistent-context.md
+- docs: update sensitive-data.md
+- docs: update session-persistence.md
+
+### Test
+
+- update tests/test_v04_context.py
+- update tests/test_v04_pipeline.py
+- update tests/test_v04_session.py
+
+### Build
+
+- update pyproject.toml
+
+### Other
+
+- update prellm/context/user_memory.py
+
+
+## [0.4.0] - 2026-02-16
+
+### Summary
+
+**Persistent context layer for small LLMs** — preLLM automatically collects env, compresses codebase,
+persists sessions, and injects everything into small-LLM prompts without manual pre-prompts.
+Sensitive data never reaches the large-LLM. Solves the "Bielik drifts after 5–10 exchanges" problem.
+
+> **Docs:** [Persistent Context](docs/persistent-context.md) · [Session Persistence](docs/session-persistence.md) · [Sensitive Data](docs/sensitive-data.md) · [Flow Graphs](docs/flow-graphs.md)
+
+### Added
+
+- **`RuntimeContext` model** (`prellm/models.py`) — unified env/process/locale/network/git/system snapshot with `token_estimate` and `sensitive_blocked_count`
+- **`SessionSnapshot` model** (`prellm/models.py`) — exportable session with `to_file()`/`from_file()` for persistence across restarts
+- **`ContextEngine.gather_runtime()`** — collects full runtime context as Pydantic model, auto-filters sensitive env vars via `SensitiveDataFilter`
+- **`ContextEngine._auto_collect_env()`** — auto-discovery of all env vars with safe/masked/blocked classification
+- **`ContextEngine._gather_process()`** — PID, CWD, user, parent PID, TTY
+- **`ContextEngine._gather_locale()`** — LANG, timezone, encoding (critical for Bielik/Polish locale)
+- **`ContextEngine._gather_network()`** — hostname, local IP (no public IP queries)
+- **`UserMemory.export_session()`** — export current session to `SessionSnapshot` (like LM Studio 'save session')
+- **`UserMemory.import_session()`** — import previously exported session
+- **`UserMemory.get_relevant_context()`** — RAG-style retrieval from history with token budget
+- **`UserMemory.auto_inject_context()`** — build enriched system_prompt from history + preferences
+- **`UserMemory.learn_preference_from_interaction()`** — auto-extract preferences (like Oobabooga Dynamic Context)
+- **`CodebaseIndexer.get_compressed_context()`** — full pipeline: index → compress → filter by query relevance with token budget
+- **`CodebaseIndexer.estimate_tokens()`** — token estimation helper
+- **3 new pipeline algo handlers** (`prellm/pipeline.py`): `runtime_collector`, `sensitive_filter`, `session_injector`
+- **`context_aware` pipeline** (`configs/pipelines.yaml`) — 6-step context-aware pipeline with auto-strategy
+- **`auto_strategy` prompt** (`configs/prompts.yaml`) — small-LLM strategy selection based on query + runtime context
+- **CLI `prellm context show`** — inspect runtime context (`--json`, `--blocked`, `--codebase .`)
+- **CLI `prellm session list|export|import|clear`** — manage persistent sessions
+- **Trace `context_collection` step type** — runtime/session/sanitize steps visible in execution trace
+- **47 new tests** across 3 test files (`test_v04_context.py`, `test_v04_session.py`, `test_v04_pipeline.py`)
+
+### Changed
+
+- **Default strategy changed from `"classify"` to `"auto"`** — small-LLM auto-selects best strategy
+- **Default `sanitize=True`** — sensitive data filtered before large-LLM by default
+- **New parameter `collect_runtime=True`** — full env/shell/process snapshot collected by default
+- **New parameter `session_path`** — path to session persistence SQLite DB
+- **New parameter `sensitive_rules`** — custom YAML rules for sensitive data classification
+- **`_execute_v3_pipeline` refactored** — split from 1 method (cc≈29) into 5 methods (cc≤10 each): `_prepare_context`, `_run_preprocessing`, `_run_execution`, `_persist_session`, `_record_trace`
+- **`__init__.py` exports** — added `RuntimeContext`, `SessionSnapshot`, `SensitiveDataFilter`, `ShellContextCollector`, `FolderCompressor`, `ContextSchemaGenerator`
+
+### Fixed
+
+- Version assertion tests updated for 0.4.0
+- `UserMemory.export_session()` — `created_at` field correctly serialized as string
+
+### Backward Compatibility
+
+- All existing parameters and defaults preserved
+- `strategy="classify"` still works as before
+- `collect_runtime=True` and `sanitize=True` are new defaults but don't break existing usage (context is additive, sanitization only affects large-LLM input)
+- `session_path=None` by default — no session persistence unless explicitly enabled
+
+
 ## [0.4.1] - 2026-02-16
 
 ### Summary

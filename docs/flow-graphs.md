@@ -180,6 +180,65 @@ graph LR
     style E fill:#f3e5f5
 ```
 
+## v0.4 Context-Aware Pipeline
+
+```mermaid
+graph TD
+    A["preprocess_and_execute(query, collect_runtime=True, session_path=...)"] --> B[RuntimeContext Collector]
+    B --> C["env_safe, process, locale, network, git, system"]
+    C --> D[Session Injector]
+    D --> E["RAG: relevant history + preferences from UserMemory"]
+    E --> F["Auto Strategy Selector (small LLM)"]
+    F --> G{Selected Strategy}
+    G -->|classify| H[Classify Intent]
+    G -->|structure| I[Extract Fields]
+    G -->|enrich| J[Add Missing Context]
+    G -->|split| K[Break into Sub-queries]
+    H --> L[Compose Prompt]
+    I --> L
+    J --> L
+    K --> L
+    L --> M[Sensitive Data Filter]
+    M --> N["Executor Agent (large LLM)"]
+    N --> O[PreLLMResponse]
+    N --> P["Session Persist (auto-save + learn prefs)"]
+
+    style B fill:#e8f5e9,stroke:#388e3c
+    style D fill:#e8f5e9,stroke:#388e3c
+    style M fill:#ffebee,stroke:#c62828
+    style F fill:#e1f5fe,stroke:#0288d1
+    style N fill:#f3e5f5,stroke:#7b1fa2
+```
+
+## v0.4 Persistent Context Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Core (preprocess_and_execute)
+    participant RT as RuntimeContext
+    participant SF as SensitiveFilter
+    participant SM as SessionMemory
+    participant PA as PreprocessorAgent (small LLM)
+    participant EA as ExecutorAgent (large LLM)
+
+    U->>C: query + session_path + codebase_path
+    C->>RT: gather_runtime()
+    RT-->>C: env, process, locale, network, git, system
+    C->>SF: filter_context_for_large_llm()
+    SF-->>C: sanitized context (API keys removed)
+    C->>SM: auto_inject_context(query)
+    SM-->>C: relevant history + preferences
+    C->>PA: preprocess(query + runtime + history + codebase)
+    PA-->>C: structured executor_input
+    C->>SF: sanitize_text(executor_input)
+    SF-->>C: clean prompt (no tokens/keys)
+    C->>EA: execute(sanitized_prompt)
+    EA-->>C: response content
+    C->>SM: add_interaction() + learn_preference()
+    C-->>U: PreLLMResponse
+```
+
 ## Strategy Decision Tree
 
 ```mermaid

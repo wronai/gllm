@@ -233,7 +233,7 @@ class UserMemory:
             session_id=sid,
             interactions=interactions,
             preferences=preferences,
-            created_at=interactions[0]["timestamp"] if interactions else str(time.time()),
+            created_at=str(interactions[0]["timestamp"]) if interactions else str(time.time()),
             exported_at=str(time.time()),
         )
 
