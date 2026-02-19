@@ -95,12 +95,35 @@ class EnvConfig:
 
 
 def load_dotenv_if_available(path: str | Path | None = None) -> None:
-    """Load .env file if it exists. No dependency on python-dotenv — just basic parsing."""
+    """Load .env file if it exists. No dependency on python-dotenv — just basic parsing.
+
+    When getv is available, also loads the user's default LLM profile
+    (set via ``getv use prellm llm PROFILE``).
+    """
+    # Load getv app defaults first (if configured)
+    if _HAS_GETV:
+        try:
+            from getv import AppDefaults
+            from getv.integrations.pydantic_env import load_profile_into_env
+            defaults = AppDefaults("prellm")
+            llm_profile = defaults.get("llm")
+            if llm_profile:
+                load_profile_into_env("llm", llm_profile)
+                logger.debug(f"Loaded getv default LLM profile: {llm_profile}")
+        except Exception:
+            pass  # non-critical
+
     candidates = [path] if path else [".env", Path.home() / ".prellm" / ".env"]
 
     for candidate in candidates:
         if candidate and Path(candidate).is_file():
             logger.debug(f"Loading .env from {candidate}")
+            if _HAS_GETV:
+                store = EnvStore(Path(candidate), auto_create=False)
+                for key, value in store.items():
+                    if key and value and key not in os.environ:
+                        os.environ[key] = value
+                return
             with open(candidate) as f:
                 for line in f:
                     line = line.strip()
